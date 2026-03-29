@@ -1,194 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-
-      // Drawer for navigation
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text(
+          'Dashboard',
+          style: GoogleFonts.lato(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.blueAccent,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.blue,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.health_and_safety, color: Colors.blue, size: 35),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Amara Mensah',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'amara@example.com',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
+            Text(
+              'Welcome Back!',
+              style: GoogleFonts.lato(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.dashboard),
-              title: const Text('Dashboard'),
-              onTap: () {},
+            const SizedBox(height: 10),
+            Text(
+              'Here’s your activity overview.',
+              style: GoogleFonts.lato(color: Colors.grey[700]),
             ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
-              onTap: () {},
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _buildStatCard(
+                  icon: Icons.medical_services,
+                  title: 'Medications',
+                  value: '5',
+                  color: Colors.orange,
+                ),
+                _buildStatCard(
+                  icon: Icons.person,
+                  title: 'Patients',
+                  value: '12',
+                  color: Colors.green,
+                ),
+                _buildStatCard(
+                  icon: Icons.notifications,
+                  title: 'Reminders',
+                  value: '3',
+                  color: Colors.red,
+                ),
+                _buildStatCard(
+                  icon: Icons.history,
+                  title: 'History',
+                  value: '8',
+                  color: Colors.blue,
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.medical_services),
-              title: const Text('Appointments'),
-              onTap: () {},
+            const SizedBox(height: 30),
+            Text(
+              'Recent Activities',
+              style: GoogleFonts.lato(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
-              onTap: () {},
+            const SizedBox(height: 10),
+            _buildActivityTile(
+              icon: Icons.check_circle,
+              title: 'Consultation Completed',
+              subtitle: 'Yesterday, 03:00 PM',
+              color: Colors.green,
             ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {
-                Navigator.pop(context);
-              },
+            _buildActivityTile(
+              icon: Icons.pending_actions,
+              title: 'New Appointment',
+              subtitle: 'Today, 11:00 AM',
+              color: Colors.orange,
+            ),
+            _buildActivityTile(
+              icon: Icons.warning,
+              title: 'Missed Dose',
+              subtitle: 'Today, 08:00 AM',
+              color: Colors.red,
             ),
           ],
-        ),
-      ),
-
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Row with Greeting and Notifications
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Good Morning, Amara",
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "Here's your health summary",
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none, size: 28),
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // Stats cards
-              GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildStatCard(
-                    icon: FontAwesomeIcons.notesMedical,
-                    title: 'Medical Notes',
-                    value: '12',
-                    color: Colors.blue,
-                  ),
-                  _buildStatCard(
-                    icon: FontAwesomeIcons.calendarCheck,
-                    title: 'Appointments',
-                    value: '3',
-                    color: Colors.green,
-                  ),
-                  _buildStatCard(
-                    icon: FontAwesomeIcons.pills,
-                    title: 'Medications',
-                    value: '5',
-                    color: Colors.orange,
-                  ),
-                  _buildStatCard(
-                    icon: FontAwesomeIcons.chartLine,
-                    title: 'Health Stats',
-                    value: 'Stable',
-                    color: Colors.red,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 25),
-
-              // Recent activity
-              Text(
-                "Recent Activity",
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              ListView(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildActivityTile(
-                    icon: FontAwesomeIcons.fileMedical,
-                    title: "Blood Test Uploaded",
-                    subtitle: "Today, 09:00 AM",
-                    color: Colors.blue,
-                  ),
-                  _buildActivityTile(
-                    icon: FontAwesomeIcons.userDoctor,
-                    title: "Consultation Completed",
-                    subtitle: "Yesterday, 03:00 PM",
-                    color: Colors.green,
-                  ),
-                  _buildActivityTile(
-                    icon: FontAwesomeIcons.pills,
-                    title: "Medication Reminder",
-                    subtitle: "Yesterday, 08:00 AM",
-                    color: Colors.orange,
-                  ),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -201,10 +104,11 @@ class DashboardScreen extends StatelessWidget {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: 160,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.shade300,
@@ -216,22 +120,18 @@ class DashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FaIcon(icon, color: color, size: 28),
+          Icon(icon, color: color, size: 28),
           const SizedBox(height: 15),
           Text(
             title,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-            ),
+            style: GoogleFonts.lato(fontSize: 14, color: Colors.grey[700]),
           ),
           const SizedBox(height: 5),
           Text(
             value,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.lato(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
             ),
           ),
         ],
@@ -245,12 +145,21 @@ class DashboardScreen extends StatelessWidget {
     required String subtitle,
     required Color color,
   }) {
-    return ListTile(
-      leading: FaIcon(icon, color: color),
-      title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: () {},
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 28),
+        title: Text(
+          title,
+          style: GoogleFonts.lato(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.lato(color: Colors.grey[600], fontSize: 12),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {},
+      ),
     );
   }
 }

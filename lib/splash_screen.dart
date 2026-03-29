@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
             Icon(
-              Icons.health_and_safety_rounded, // temporary "logo"
+              Icons.health_and_safety_rounded,
               size: 100,
               color: Colors.white,
             ),
