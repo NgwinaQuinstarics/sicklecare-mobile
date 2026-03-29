@@ -1,17 +1,34 @@
-# sicklecare_app
+# SickleCare Mobile App
 
-A new Flutter project.
+A **Flutter-based mobile application** for managing Sickle Cell Disease (SCD) health data.  
+This is the **Flutter version** of the previously React Native SickleCare app.
+
+## Features (Demo)
+
+- User login and signup  
+- Password visibility toggle  
+- Dashboard with basic stats and navigation  
+- Clean and modern UI using Google Fonts  
+- Demo mode without backend integration  
+
+## Screens
+
+- **Login Screen**  
+- **Signup Screen**  
+- **Dashboard Screen**  
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Prerequisites
 
-A few resources to get you started if this is your first Flutter project:
+- Flutter SDK >= 3.0  
+- Dart >= 3.0  
+- An editor like VS Code or Android Studio  
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### Run the App
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. Clone the repo:
+
+```bash
+git clone https://github.com/NgwinaQuinstarics/sicklecare-mobile.git
+cd sicklecare-app
