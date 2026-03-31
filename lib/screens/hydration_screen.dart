@@ -1,187 +1,322 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../constants/app_colors.dart';
-import '../store/app_state.dart';
-import '../widgets/sc_card.dart';
-import '../widgets/sc_button.dart';
+import 'home_screen.dart';
 
-class HydrationScreen extends StatelessWidget {
-  const HydrationScreen({super.key});
+class HydrationNutritionScreen extends StatefulWidget {
+  const HydrationNutritionScreen({super.key});
+
+  @override
+  State<HydrationNutritionScreen> createState() =>
+      _HydrationNutritionScreenState();
+}
+
+class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
+  // Hydration
+  int glasses = 3;
+  final int hydrationGoal = 8;
+
+  // Nutrition
+  int meals = 2;
+  final int nutritionGoal = 3;
+
+  // Days of week
+  final List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  void logGlass() {
+    if (glasses < hydrationGoal) {
+      setState(() {
+        glasses++;
+      });
+    }
+  }
+
+  void logMeal() {
+    if (meals < nutritionGoal) {
+      setState(() {
+        meals++;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final h = context.watch<HydrationProvider>();
-    final pct = (h.percentage * 100).round();
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final hydrationPct = ((glasses / hydrationGoal) * 100).round();
+    final nutritionPct = ((meals / nutritionGoal) * 100).round();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF5F6FA),
+      appBar: AppBar(
+        backgroundColor: Colors.blueAccent,
+        title: const Text('Health Tracker'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home),
+            onPressed: () {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const HomeScreen()));
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Hydration 💧', style: GoogleFonts.nunito(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.navy)),
-              Text('Stay hydrated, stay strong', style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.muted)),
-            ]),
-          ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            children: [
+              // HEADER MESSAGE
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stay Healthy 💧🍎',
+                      style: GoogleFonts.nunito(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Track your hydration and nutrition for a better you.',
+                      style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
-              child: Column(children: [
+              const SizedBox(height: 24),
 
-                // MAIN TRACKER
-                ScCard(
-                  child: Column(children: [
-                    Text('TODAY\'S PROGRESS',
-                      style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800,
-                        color: AppColors.muted, letterSpacing: 0.7)),
-                    const SizedBox(height: 20),
-
-                    Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      // Left: count
-                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                        Text('${h.glasses}', style: GoogleFonts.nunito(fontSize: 52, fontWeight: FontWeight.w900, color: AppColors.teal, height: 1)),
-                        Text('of ${h.goal} glasses', style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w600)),
-                      ]),
-                      const SizedBox(width: 24),
-
-                      // Bottle
-                      Stack(alignment: Alignment.center, children: [
-                        Container(
-                          width: 72, height: 120,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0FEFA),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.teal, width: 3),
+              // HYDRATION CARD
+              Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Hydration Tracker",
+                        style: GoogleFonts.nunito(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.blueAccent),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Glass count
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('$glasses',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 52,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.blueAccent)),
+                              Text('of $hydrationGoal glasses',
+                                  style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600])),
+                            ],
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(9),
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 400),
-                                height: 120 * h.percentage,
-                                color: AppColors.teal,
+                          const SizedBox(width: 24),
+                          // Bottle graphic
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.blueAccent, width: 3),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 400),
+                                    height: 120 * (glasses / hydrationGoal),
+                                    color: Colors.blueAccent,
+                                  ),
+                                ),
                               ),
-                            ),
+                              Text('$hydrationPct%',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white)),
+                            ],
                           ),
+                          const SizedBox(width: 24),
+                          // Remaining
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Remaining',
+                                  style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600])),
+                              Text('${hydrationGoal - glasses}',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black87)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 50, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
-                        Text('$pct%', style: GoogleFonts.nunito(
-                          fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.navy)),
-                      ]),
-                      const SizedBox(width: 24),
-
-                      // Right: remaining
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Remaining', style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w600)),
-                        Text('${h.goal - h.glasses}', style: GoogleFonts.nunito(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.navy)),
-                      ]),
-                    ]),
-
-                    const SizedBox(height: 20),
-
-                    // GLASS BUTTONS
-                    Wrap(
-                      spacing: 8, runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: List.generate(h.goal, (i) {
-                        final filled = i < h.glasses;
-                        return GestureDetector(
-                          onTap: () => context.read<HydrationProvider>().setGlasses(i + 1),
-                          child: Container(
-                            width: 42, height: 50,
-                            decoration: BoxDecoration(
-                              color: filled ? AppColors.tealLight : AppColors.card,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: filled ? AppColors.teal : AppColors.border, width: 2),
-                            ),
-                            child: Center(child: Text(
-                              filled ? '🥛' : '🫙', style: const TextStyle(fontSize: 22))),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 20),
-
-                    ScButton(
-                      label: h.glasses >= h.goal ? '🎉 Goal Reached!' : '+ Log a Glass',
-                      onPressed: h.glasses < h.goal ? () => context.read<HydrationProvider>().logGlass() : () {},
-                      variant: BtnVariant.teal,
-                    ),
-
-                    if (h.glasses >= h.goal) ...[
-                      const SizedBox(height: 10),
-                      Text('Amazing! Daily goal reached. 🎉',
-                        style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.teal),
-                        textAlign: TextAlign.center),
+                        onPressed: glasses < hydrationGoal ? logGlass : null,
+                        child: Text(
+                          glasses >= hydrationGoal
+                              ? '🎉 Goal Reached!'
+                              : '+ Log a Glass',
+                          style: GoogleFonts.nunito(
+                              fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                      ),
                     ],
-                  ]),
+                  ),
                 ),
+              ),
 
-                // WEEKLY STREAK
-                ScCard(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('WEEKLY STREAK 🔥',
-                      style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800,
-                        color: AppColors.muted, letterSpacing: 0.7)),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: List.generate(7, (i) {
-                        final s = h.weekStreak[i];
-                        Color bg; String inner;
-                        if (s == 1)      { bg = AppColors.teal; inner = '✓'; }
-                        else if (s == 2) { bg = AppColors.blue; inner = '💧'; }
-                        else             { bg = AppColors.border; inner = '–'; }
-                        return Column(children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-                            child: Center(child: Text(inner, style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w800, fontSize: s == 2 ? 16 : 14))),
+              const SizedBox(height: 24),
+
+              // NUTRITION CARD
+              Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Nutrition Tracker",
+                        style: GoogleFonts.nunito(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.orangeAccent),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('$meals',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 52,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.orangeAccent)),
+                              Text('of $nutritionGoal meals',
+                                  style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600])),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(days[i], style: GoogleFonts.nunito(fontSize: 9, color: AppColors.muted, fontWeight: FontWeight.w700)),
-                        ]);
-                      }),
-                    ),
-                    const SizedBox(height: 12),
-                    Center(child: Text('🔥 14-day streak!',
-                      style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.amber))),
-                  ]),
+                          const SizedBox(width: 24),
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: Colors.orangeAccent.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.orangeAccent, width: 3),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 400),
+                                    height: 120 * (meals / nutritionGoal),
+                                    color: Colors.orangeAccent,
+                                  ),
+                                ),
+                              ),
+                              Text('$nutritionPct%',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white)),
+                            ],
+                          ),
+                          const SizedBox(width: 24),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Remaining',
+                                  style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600])),
+                              Text('${nutritionGoal - meals}',
+                                  style: GoogleFonts.nunito(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black87)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orangeAccent,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 50, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: meals < nutritionGoal ? logMeal : null,
+                        child: Text(
+                          meals >= nutritionGoal
+                              ? '🎉 Goal Reached!'
+                              : '+ Log a Meal',
+                          style: GoogleFonts.nunito(
+                              fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-
-                // LOG HISTORY
-                ScCard(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('TODAY\'S LOG',
-                      style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800,
-                        color: AppColors.muted, letterSpacing: 0.7)),
-                    const SizedBox(height: 12),
-                    ...['Glass 5 logged · 11:42 AM', 'Glass 4 logged · 10:15 AM',
-                        'Glass 3 logged · 9:00 AM',  'Morning glasses (1–2) · 8:10 AM']
-                      .asMap().entries.map((e) => Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          border: e.key < 3 ? const Border(bottom: BorderSide(color: AppColors.border)) : null),
-                        child: Row(children: [
-                          Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.teal, shape: BoxShape.circle)),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(e.value.split(' · ')[0],
-                            style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.navy, fontWeight: FontWeight.w500))),
-                          Text(e.value.split(' · ')[1], style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.muted)),
-                        ]),
-                    )),
-                  ]),
-                ),
-              ]),
-            ),
+              ),
+            ],
           ),
-        ]),
+        ),
       ),
     );
   }

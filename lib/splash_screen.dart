@@ -1,6 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'login.dart';
+import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,8 +13,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Navigate to login after 3 seconds
-    Timer(const Duration(seconds: 3), () {
+    Timer(const Duration(seconds: 2), () {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -25,25 +24,20 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueAccent,
+      backgroundColor: Colors.red,
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(
-              Icons.health_and_safety_rounded,
-              size: 100,
-              color: Colors.white,
-            ),
+            Icon(Icons.bloodtype, color: Colors.white, size: 100),
             SizedBox(height: 20),
             Text(
-              'Welcome to SickleCare App',
+              'SickleCare',
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
