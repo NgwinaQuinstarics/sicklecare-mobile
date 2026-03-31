@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
+    <!-- ===== QUERY INTENTS (Android 11+) ===== -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+
     <application
         android:label="sicklecare_app"
         android:name="${applicationName}"
@@ -30,18 +38,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Required by Flutter -->
+        <!-- Required by Flutter embedding v2 -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <!-- Query for PROCESS_TEXT (Flutter plugin requirement) -->
-        <queries>
-            <intent>
-                <action android:name="android.intent.action.PROCESS_TEXT"/>
-                <data android:mimeType="text/plain"/>
-            </intent>
-        </queries>
 
     </application>
 </manifest>
