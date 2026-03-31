@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'hydration_screen.dart';
 import 'reminders_screen.dart';
+import 'crisis_screen.dart';
 import 'support_screen.dart';
+import 'weather_screen.dart'; // NEW
+import 'goals_screen.dart';   // NEW
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -74,7 +76,6 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -115,7 +116,7 @@ class HomeScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const HydrationScreen()),
+                            builder: (_) => const HydrationNutritionScreen()),
                       );
                     },
                   ),
@@ -134,10 +135,42 @@ class HomeScreen extends StatelessWidget {
                   ),
 
                   _actionCard(
+                    icon: Icons.wb_sunny,
+                    title: "Weather",
+                    color: Colors.lightBlue,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const WeatherScreen()),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
+                    icon: Icons.flag,
+                    title: "Goals",
+                    color: Colors.purple,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const GoalsScreen()),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
                     icon: Icons.warning,
                     title: "Crisis Help",
                     color: Colors.red,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const CrisisScreen()),
+                      );
+                    },
                   ),
 
                   _actionCard(
