@@ -1,108 +1,113 @@
+// lib/screens/weather_screen.dart
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../models/weather_model.dart';
 import '../services/weather_service.dart';
 
 class WeatherScreen extends StatefulWidget {
-  const WeatherScreen({super.key});
+  const WeatherScreen({super.key}); 
 
   @override
   State<WeatherScreen> createState() => _WeatherScreenState();
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  Weather? _weather;
-  bool _loading = true;
-  String? _advice;
+  Map<String, dynamic>? weatherData;
+  bool isLoading = true;
+  String adviceMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchWeather();
+    fetchWeather();
   }
 
-  Future<void> _fetchWeather() async {
-    setState(() => _loading = true);
-
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-
-    final service = WeatherService();
-    final weather = await service.getWeather(position.latitude, position.longitude);
-
-    String advice = '';
-    if (weather != null) {
-      if (weather.temp < 18) {
-        advice = 'It\'s cold 🥶, wear warm clothes!';
-      } else if (weather.temp > 30) {
-        advice = 'It\'s hot 🔥, stay hydrated!';
-      } else {
-        advice = 'Weather is nice 🌤️, have a great day!';
+  Future<void> fetchWeather() async {
+    try {
+      // Request location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          setState(() {
+            isLoading = false;
+            adviceMessage = 'Location permission denied';
+          });
+          return;
+        }
       }
-    }
 
-    setState(() {
-      _weather = weather;
-      _advice = advice;
-      _loading = false;
-    });
+      // Get current location
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Fetch weather data
+      WeatherService service = WeatherService();
+      final data = await service.getWeather(position.latitude, position.longitude);
+
+      // Set advice based on temperature
+      double temp = data['main']['temp'];
+      if (temp <= 18) {
+        adviceMessage = 'It’s cold! Stay warm and wear extra layers.';
+      } else if (temp <= 25) {
+        adviceMessage = 'Cool weather, dress comfortably.';
+      } else {
+        adviceMessage = 'It’s warm! Stay hydrated and wear light clothes.';
+      }
+
+      setState(() {
+        weatherData = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        adviceMessage = 'Error fetching weather: $e';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueAccent.shade100,
       appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
-        title: const Text('Weather'),
-        centerTitle: true,
+        title: const Text('Weather in Cameroon'),
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _weather == null
-              ? const Center(child: Text('Failed to fetch weather'))
+          : weatherData == null
+              ? Center(child: Text(adviceMessage))
               : Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        _weather!.city,
-                        style: GoogleFonts.nunito(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '${_weather!.temp.toStringAsFixed(1)}°C',
-                        style: GoogleFonts.nunito(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _weather!.description,
-                        style: GoogleFonts.dmSans(
-                            fontSize: 20, color: Colors.white70),
+                        '${weatherData!['name']}', // City name
+                        style: const TextStyle(
+                            fontSize: 28, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(50),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _advice ?? '',
-                          style: GoogleFonts.dmSans(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
+                      Text(
+                        '${weatherData!['main']['temp'].toString()} °C',
+                        style: const TextStyle(
+                            fontSize: 40, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${weatherData!['weather'][0]['description']}',
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      const SizedBox(height: 30),
+                      Text(
+                        adviceMessage,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
