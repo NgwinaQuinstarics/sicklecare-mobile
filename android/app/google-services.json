@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "111313868694",
+    "project_id": "sicklecare-5a81c",
+    "storage_bucket": "sicklecare-5a81c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:111313868694:android:7f6e23e950d7f5b7eaefb7",
+        "android_client_info": {
+          "package_name": "com.example.sicklecare_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfEqK-msjD_hxMl1qxad11nT4wDf32_oU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
