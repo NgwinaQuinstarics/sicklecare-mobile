@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-//import 'login.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'splash_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); 
+  await Firebase.initializeApp(); //Initialize Firebase
+
   runApp(const SickleCareApp());
 }
 
