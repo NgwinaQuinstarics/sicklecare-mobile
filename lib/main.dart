@@ -5,11 +5,9 @@ import 'login.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   runApp(const SickleCareApp());
 }
 
@@ -20,10 +18,8 @@ class SickleCareApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'SickleCare',
-      theme: ThemeData(
-        primarySwatch: Colors.red,
-      ),
+      title: 'SickleCare App',
+      theme: ThemeData(primarySwatch: Colors.red),
       home: const LoginScreen(),
     );
   }
