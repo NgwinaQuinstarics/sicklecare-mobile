@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'login.dart';
 import 'dart:async';
+import 'login.dart';
+
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,7 +14,12 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 2), () {
+    _navigateToNext();
+  }
+
+  void _navigateToNext() {
+    Timer(const Duration(seconds: 3), () {
+      if (!mounted) return; // prevents async BuildContext errors
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -23,23 +29,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.red,
+    return const Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.bloodtype, color: Colors.white, size: 100),
-            SizedBox(height: 20),
-            Text(
-              'SickleCare',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        child: Text(
+          'SickleCare',
+          style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
         ),
       ),
     );

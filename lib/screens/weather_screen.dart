@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import '../services/weather_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -10,102 +10,119 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class WeatherScreenState extends State<WeatherScreen> {
-  WeatherService weatherService = WeatherService();
-  double? latitude;
-  double? longitude;
-  Map<String, dynamic>? weatherData;
-  bool isLoading = true;
+  final TextEditingController _locationController = TextEditingController();
+  String? _weatherDescription;
+  double? _temperature;
+  String? _advice;
+  bool _loading = false;
+
+  // Replace with your OpenWeatherMap API key
+  final String apiKey = 'YOUR_OPENWEATHERMAP_API_KEY';
+
+  Future<void> fetchWeather(String city) async {
+    setState(() {
+      _loading = true;
+    });
+
+    final url = Uri.parse(
+        'https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey&units=metric');
+
+    try {
+      final response = await http.get(url);
+      if (!mounted) return; // Prevent setState after dispose
+      final data = json.decode(response.body);
+
+      if (data['cod'] == 200) {
+        double temp = data['main']['temp'];
+        String desc = data['weather'][0]['description'];
+
+        String advice;
+        if (temp < 18) {
+          advice = "It's cold. Stay warm and avoid getting chilled.";
+        } else if (temp > 28) {
+          advice = "It's hot. Stay hydrated and avoid heat stress.";
+        } else {
+          advice = "Weather is mild. Stay comfortable and hydrated.";
+        }
+
+        setState(() {
+          _temperature = temp;
+          _weatherDescription = desc;
+          _advice = advice;
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _weatherDescription = "City not found";
+          _temperature = null;
+          _advice = null;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _weatherDescription = "Error fetching weather";
+        _temperature = null;
+        _advice = null;
+        _loading = false;
+      });
+    }
+  }
 
   @override
-  void initState() {
-    super.initState();
-    getLocationAndWeather();
-  }
-
-  Future<void> getLocationAndWeather() async {
-    setState(() => isLoading = true);
-
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
-        return;
-      }
-    }
-
-    Position position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
-    );
-
-    latitude = position.latitude;
-    longitude = position.longitude;
-
-    weatherData = await weatherService.getWeather(latitude!, longitude!);
-
-    // Convert temp to double safely
-    if (weatherData != null && weatherData!['temp'] is int) {
-      weatherData!['temp'] = (weatherData!['temp'] as int).toDouble();
-    }
-
-    setState(() => isLoading = false);
-  }
-
-  String getWeatherMessage(double temp) {
-    if (temp < 10) return 'Brrr… Stay warm! 🧣';
-    if (temp < 20) return 'It\'s a bit chilly. Wear a jacket! 🧥';
-    if (temp < 30) return 'Nice weather today! 🌤️';
-    return 'It\'s hot! Stay cool! ☀️';
-  }
-
-  String getWeatherIcon(String iconCode) {
-    return 'http://openweathermap.org/img/wn/$iconCode@2x.png';
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Weather'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: getLocationAndWeather,
-          ),
-        ],
-      ),
-      body: Center(
-        child: isLoading
-            ? const CircularProgressIndicator()
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      appBar: AppBar(title: const Text('Weather & Advice')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _locationController,
+              decoration: const InputDecoration(
+                labelText: 'Enter your city',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                final city = _locationController.text.trim();
+                if (city.isNotEmpty) {
+                  fetchWeather(city);
+                }
+              },
+              child: const Text('Check Weather'),
+            ),
+            const SizedBox(height: 24),
+            if (_loading) const CircularProgressIndicator(),
+            if (!_loading && _weatherDescription != null)
+              Column(
                 children: [
-                  Image.network(getWeatherIcon(weatherData!['icon'])),
-                  const SizedBox(height: 20),
                   Text(
-                    '${(weatherData!['temp'] as double).toStringAsFixed(1)}°C',
-                    style: const TextStyle(
-                        fontSize: 40, fontWeight: FontWeight.bold),
+                    'Weather: $_weatherDescription',
+                    style: const TextStyle(fontSize: 18),
                   ),
-                  const SizedBox(height: 10),
                   Text(
-                    weatherData!['description'].toString(),
-                    style: const TextStyle(fontSize: 20),
+                    'Temperature: ${_temperature?.toStringAsFixed(1)}°C',
+                    style: const TextStyle(fontSize: 18),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                   Text(
-                    getWeatherMessage(weatherData!['temp'] as double),
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w500),
-                    textAlign: TextAlign.center,
+                    'Advice: $_advice',
+                    style: const TextStyle(fontSize: 16, color: Colors.blue),
                   ),
                 ],
               ),
+          ],
+        ),
       ),
     );
   }

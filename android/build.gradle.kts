@@ -7,8 +7,7 @@ buildscript {
     }
 
     dependencies {
-        // Firebase plugin
-        classpath 'com.google.gms:google-services:4.3.15'
+        classpath("com.google.gms:google-services:4.3.15")
     }
 }
 
@@ -18,7 +17,6 @@ allprojects {
         mavenCentral()
     }
 }
-
 // Custom build directories
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
