@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../login.dart';
+import 'hydration_nutrition_screen.dart';
+import 'tracker_screen.dart';
+import 'reminders_screen.dart';
+import 'goals_screen.dart';
 import 'support_screen.dart';
-import 'crisis_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,284 +16,360 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 0;
+  final user = FirebaseAuth.instance.currentUser;
+  final firestore = FirebaseFirestore.instance;
 
-  final List<Widget> pages = [
-    const HomeContent(),
-    const SupportScreen(),
-    const CrisisScreen(),
-  ];
+  String get today {
+    final now = DateTime.now();
+    return "${now.year}-${now.month}-${now.day}";
+  }
+
+  Future<void> logout() async {
+    await FirebaseAuth.instance.signOut();
+  }
+
+  // ✅ SAVE PAIN LEVEL (FIXED PATH)
+  Future<void> savePainLevel(double value) async {
+    final uid = user?.uid;
+    if (uid == null) return;
+
+    await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('daily') // ✅ FIXED HERE
+        .doc(today)
+        .set({
+      'painLevel': value,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final uid = user?.uid;
+
     return Scaffold(
+      backgroundColor: Colors.grey[100],
+
+      drawer: _buildDrawer(),
+
       appBar: AppBar(
-        title: const Text("SickleCare"),
         backgroundColor: Colors.redAccent,
-      ),
-
-      // 🔥 DRAWER MENU
-      drawer: const AppDrawer(),
-
-      body: pages[currentIndex],
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        selectedItemColor: Colors.redAccent,
-        onTap: (index) => setState(() => currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.support), label: "Support"),
-          BottomNavigationBarItem(icon: Icon(Icons.warning), label: "Crisis"),
+        title: const Text("SickleCare"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: logout,
+          )
         ],
       ),
-    );
-  }
-}
 
-////////////////////////////////////////////////////////////
-/// HOME CONTENT
-////////////////////////////////////////////////////////////
+      // 🔥 REAL-TIME DATA
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: firestore
+            .collection('users')
+            .doc(uid)
+            .collection('daily') // ✅ FIXED HERE
+            .doc(today)
+            .snapshots(),
+        builder: (context, snapshot) {
+          double hydration = 0;
+          double painLevel = 0;
+          int mealsCount = 0;
 
-class HomeContent extends StatelessWidget {
-  const HomeContent({super.key});
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data =
+                snapshot.data!.data() as Map<String, dynamic>;
 
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? "User";
+            hydration = (data['hydration'] ?? 0).toDouble();
+            painLevel = (data['painLevel'] ?? 0).toDouble();
+            mealsCount =
+                (data['meals'] as List?)?.length ?? 0;
+          }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: ListView(
-        children: [
-
-          // 🔴 WELCOME CARD
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.redAccent, Colors.orangeAccent],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              "Welcome, $name ❤️\nStay strong & take care.",
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-
-          const SizedBox(height: 25),
-
-          const Text("Quick Access",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
-          const SizedBox(height: 15),
-
-          Row(
-            children: [
-              _card(context, Icons.chat, "AI Chat"),
-              _card(context, Icons.cloud, "Weather"),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          Row(
-            children: [
-              _card(context, Icons.menu_book, "Education"),
-              _card(context, Icons.health_and_safety, "Health Tips"),
-            ],
-          ),
-
-          const SizedBox(height: 25),
-
-          const Text("Daily Advice",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
-          const SizedBox(height: 10),
-
-          Container(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              "Stay hydrated, avoid stress, and take your medication regularly.",
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+            children: [
 
-  Widget _card(BuildContext context, IconData icon, String title) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("$title coming soon")),
+              // 👋 Welcome
+              const Text(
+                "Welcome back, Warrior 💪",
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 5),
+
+              Text(
+                user?.email ?? "",
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+
+              const SizedBox(height: 20),
+
+              // 📊 STATS
+              Row(
+                children: [
+                  _card(
+                    "Hydration",
+                    "${hydration.toStringAsFixed(1)} L",
+                    Icons.water_drop,
+                  ),
+                  const SizedBox(width: 10),
+                  _card(
+                    "Meals",
+                    "$mealsCount meals",
+                    Icons.restaurant,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  _card(
+                    "Pain",
+                    painLevel.toInt().toString(),
+                    Icons.monitor_heart,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // ❤️ PAIN TRACKER
+              const Text(
+                "How are you feeling today?",
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600),
+              ),
+
+              const SizedBox(height: 10),
+
+              Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Pain Level: ${painLevel.toInt()}",
+                        style:
+                            const TextStyle(fontSize: 16),
+                      ),
+                      Slider(
+                        value: painLevel,
+                        min: 0,
+                        max: 10,
+                        divisions: 10,
+                        activeColor: Colors.redAccent,
+                        label:
+                            painLevel.toInt().toString(),
+                        onChanged: (value) {
+                          setState(() {
+                            painLevel = value;
+                          });
+                          savePainLevel(value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ⚡ QUICK ACTIONS
+              const Text(
+                "Quick Actions",
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600),
+              ),
+
+              const SizedBox(height: 10),
+
+              GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                physics:
+                    const NeverScrollableScrollPhysics(),
+                children: [
+
+                  _actionCard(
+                    "Health",
+                    Icons.favorite,
+                    Colors.blue,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const HydrationNutritionScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
+                    "Tracker",
+                    Icons.warning,
+                    Colors.red,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const TrackerScreen()),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
+                    "Reminders",
+                    Icons.alarm,
+                    Colors.orange,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const RemindersScreen()),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
+                    "Goals",
+                    Icons.flag,
+                    Colors.green,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const GoalsScreen()),
+                      );
+                    },
+                  ),
+
+                  _actionCard(
+                    "Support",
+                    Icons.people,
+                    Colors.teal,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                const SupportScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+            ],
           );
         },
-        child: Container(
-          margin: const EdgeInsets.all(6),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
+      ),
+    );
+  }
+
+  // 🔥 DRAWER
+  Widget _buildDrawer() {
+    return Drawer(
+      child: ListView(
+        children: [
+          UserAccountsDrawerHeader(
+            accountEmail: Text(user?.email ?? ""),
+            accountName: const Text("SickleCare User"),
+            decoration:
+                const BoxDecoration(color: Colors.redAccent),
           ),
+
+          _drawerItem("Home", Icons.home, () {
+            Navigator.pop(context);
+          }),
+
+          _drawerItem("Health", Icons.favorite, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      const HydrationNutritionScreen()),
+            );
+          }),
+
+          _drawerItem("Tracker", Icons.warning, () {}),
+          _drawerItem("Reminders", Icons.alarm, () {}),
+          _drawerItem("Goals", Icons.flag, () {}),
+          _drawerItem("Support", Icons.people, () {}),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerItem(
+      String title, IconData icon, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      onTap: onTap,
+    );
+  }
+
+  // 📊 CARD
+  Widget _card(String title, String value, IconData icon) {
+    return Expanded(
+      child: Card(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(icon, size: 30, color: Colors.blue),
+              Icon(icon,
+                  size: 30, color: Colors.redAccent),
               const SizedBox(height: 10),
-              Text(title),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 5),
+              Text(value,
+                  style: const TextStyle(fontSize: 16)),
             ],
           ),
         ),
       ),
     );
   }
-}
 
-////////////////////////////////////////////////////////////
-/// DRAWER MENU (VERY IMPORTANT)
-////////////////////////////////////////////////////////////
-
-class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Drawer(
-      child: ListView(
-        children: [
-
-          // 🔹 USER HEADER
-          UserAccountsDrawerHeader(
-            decoration: const BoxDecoration(color: Colors.redAccent),
-            accountName: Text(user?.displayName ?? "User"),
-            accountEmail: Text(user?.email ?? ""),
-            currentAccountPicture: const CircleAvatar(
-              child: Icon(Icons.person),
-            ),
+  // ⚡ ACTION CARD
+  Widget _actionCard(
+      String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: color),
+              const SizedBox(height: 10),
+              Text(title,
+                  textAlign: TextAlign.center),
+            ],
           ),
-
-          ListTile(
-            leading: const Icon(Icons.person),
-            title: const Text("Profile"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.support),
-            title: const Text("Support"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SupportScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.warning),
-            title: const Text("Crisis Help"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CrisisScreen()),
-              );
-            },
-          ),
-
-          const Divider(),
-
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text("Logout"),
-            onTap: () async {
-              await FirebaseAuth.instance.signOut();
-
-              if (!context.mounted) return;
-
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text("Delete Account"),
-            onTap: () async {
-              try {
-                await FirebaseAuth.instance.currentUser!.delete();
-
-                if (!context.mounted) return;
-
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Re-login required before deleting")),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-////////////////////////////////////////////////////////////
-/// PROFILE SCREEN
-////////////////////////////////////////////////////////////
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const CircleAvatar(radius: 40, child: Icon(Icons.person)),
-
-            const SizedBox(height: 15),
-
-            Text(user?.displayName ?? "No Name",
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
-            Text(user?.email ?? ""),
-
-            const SizedBox(height: 20),
-
-            const Text("More profile features coming soon..."),
-          ],
         ),
       ),
     );
