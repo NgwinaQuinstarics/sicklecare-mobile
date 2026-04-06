@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'home_screen.dart';
-import 'tracker_screen.dart';
-import 'reminders_screen.dart';
-import 'goals_screen.dart';
-import 'support_screen.dart';
+import '../widgets/app_drawer.dart';
 
 class HydrationNutritionScreen extends StatefulWidget {
   const HydrationNutritionScreen({super.key});
@@ -52,7 +48,7 @@ class _HydrationNutritionScreenState
     }
   }
 
-  // ✅ SAVE DATA (FIXED)
+  // ✅ SAVE DATA
   Future<void> saveData() async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -82,15 +78,20 @@ class _HydrationNutritionScreenState
   }
 
   @override
+  void dispose() {
+    mealController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(), // ✅ GLOBAL DRAWER
+
       appBar: AppBar(
         title: const Text("Health Tracker"),
         backgroundColor: Colors.redAccent,
       ),
-
-      // ✅ DRAWER NAVIGATION
-      drawer: _buildDrawer(context),
 
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -112,8 +113,10 @@ class _HydrationNutritionScreenState
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text("${water.toStringAsFixed(1)} L",
-                        style: const TextStyle(fontSize: 18)),
+                    Text(
+                      "${water.toStringAsFixed(1)} L",
+                      style: const TextStyle(fontSize: 18),
+                    ),
                     Slider(
                       value: water,
                       min: 0,
@@ -193,40 +196,6 @@ class _HydrationNutritionScreenState
           ],
         ),
       ),
-    );
-  }
-
-  // ✅ COMMON DRAWER
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.redAccent),
-            child: Text("SickleCare Menu",
-                style: TextStyle(color: Colors.white, fontSize: 18)),
-          ),
-
-          _navItem("Home", Icons.home, const HomeScreen()),
-          _navItem("Tracker", Icons.warning, const TrackerScreen()),
-          _navItem("Reminders", Icons.alarm, const RemindersScreen()),
-          _navItem("Goals", Icons.flag, const GoalsScreen()),
-          _navItem("Support", Icons.people, const SupportScreen()),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(String title, IconData icon, Widget screen) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      onTap: () {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => screen),
-        );
-      },
     );
   }
 }

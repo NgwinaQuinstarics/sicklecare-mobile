@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../constants/app_colors.dart';
-import '../models/reminder_model.dart';
-import '../store/app_state.dart';
-import '../widgets/sc_button.dart';
-import '../widgets/sc_input.dart';
+import '../widgets/app_drawer.dart';
+import '../services/notification_service.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -16,296 +13,157 @@ class RemindersScreen extends StatefulWidget {
 }
 
 class _RemindersScreenState extends State<RemindersScreen> {
-  final _titleCtrl = TextEditingController();
-  final _timeCtrl = TextEditingController(text: '08:00');
-  String _type = 'medication';
+  final user = FirebaseAuth.instance.currentUser;
+  final firestore = FirebaseFirestore.instance;
 
-  void _showAddSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddReminderSheet(
-        titleCtrl: _titleCtrl,
-        timeCtrl: _timeCtrl,
-        type: _type,
-        onTypeChanged: (t) => setState(() => _type = t),
-        onSave: () {
-          if (_titleCtrl.text.trim().isEmpty) return;
+  bool hydrationReminder = false;
+  bool medicationReminder = false;
 
-          context.read<ReminderProvider>().add(
-                ReminderModel(
-                  id: DateTime.now().millisecondsSinceEpoch,
-                  title: _titleCtrl.text.trim(),
-                  type: _type,
-                  time: _timeCtrl.text,
-                  frequency: 'daily',
-                ),
-              );
+  TimeOfDay hydrationTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay medicationTime = const TimeOfDay(hour: 20, minute: 0);
 
-          _titleCtrl.clear();
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
+  // ✅ LOAD SETTINGS FROM FIREBASE
+  Future<void> loadData() async {
+    final uid = user?.uid;
+    if (uid == null) return;
 
-  @override
-  Widget build(BuildContext context) {
-    final store = context.watch<ReminderProvider>();
+    final doc = await firestore.collection('users').doc(uid).get();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.blue,
-        onPressed: _showAddSheet,
-        child: const Icon(Icons.add),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // HEADER
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Reminders',
-                        style: GoogleFonts.nunito(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.navy,
-                        ),
-                      ),
-                      Text(
-                        'Long press to delete',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 11,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+    if (!mounted) return;
 
-            // LIST
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (store.morning.isNotEmpty) ...[
-                    _section('Morning'),
-                    ...store.morning.map((r) => _tile(r)),
-                  ],
-                  if (store.afternoon.isNotEmpty) ...[
-                    _section('Afternoon'),
-                    ...store.afternoon.map((r) => _tile(r)),
-                  ],
-                  if (store.evening.isNotEmpty) ...[
-                    _section('Evening'),
-                    ...store.evening.map((r) => _tile(r)),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    if (doc.exists) {
+      final data = doc.data()!;
 
-  Widget _section(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: GoogleFonts.nunito(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: AppColors.muted,
-        ),
-      ),
-    );
-  }
-
-  Widget _tile(ReminderModel r) {
-    IconData icon;
-
-    switch (r.type) {
-      case 'medication':
-        icon = Icons.medication;
-        break;
-      case 'hydration':
-        icon = Icons.water_drop;
-        break;
-      case 'food':
-        icon = Icons.restaurant;
-        break;
-      case 'exercise':
-        icon = Icons.fitness_center;
-        break;
-      default:
-        icon = Icons.notifications;
+      setState(() {
+        hydrationReminder = data['hydrationReminder'] ?? false;
+        medicationReminder = data['medicationReminder'] ?? false;
+      });
     }
-
-    return GestureDetector(
-      onLongPress: () {
-        context.read<ReminderProvider>().remove(r.id);
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.blue.withAlpha(30), // FIXED (no withOpacity)
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: AppColors.blueLight,
-              child: Icon(icon, color: AppColors.blue),
-            ),
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    r.title,
-                    style: GoogleFonts.nunito(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    '${r.time} • ${r.frequency}',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // FIXED SWITCH
-            Switch(
-              value: r.isActive,
-              activeThumbColor: AppColors.blue,
-              onChanged: (v) {
-                context.read<ReminderProvider>().toggle(r.id, v);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
-}
 
-class _AddReminderSheet extends StatefulWidget {
-  final TextEditingController titleCtrl;
-  final TextEditingController timeCtrl;
-  final String type;
-  final ValueChanged<String> onTypeChanged;
-  final VoidCallback onSave;
+  // ✅ SAVE SETTINGS
+  Future<void> saveSettings() async {
+    final uid = user?.uid;
+    if (uid == null) return;
 
-  const _AddReminderSheet({
-    required this.titleCtrl,
-    required this.timeCtrl,
-    required this.type,
-    required this.onTypeChanged,
-    required this.onSave,
-  });
+    await firestore.collection('users').doc(uid).set({
+      'hydrationReminder': hydrationReminder,
+      'medicationReminder': medicationReminder,
+    }, SetOptions(merge: true));
+  }
 
-  @override
-  State<_AddReminderSheet> createState() => _AddReminderSheetState();
-}
+  // ⏰ PICK TIME
+  Future<void> pickTime(bool isHydration) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isHydration ? hydrationTime : medicationTime,
+    );
 
-class _AddReminderSheetState extends State<_AddReminderSheet> {
-  final types = ['medication', 'hydration', 'food', 'exercise'];
-  late String selected;
+    if (picked != null) {
+      setState(() {
+        if (isHydration) {
+          hydrationTime = picked;
+        } else {
+          medicationTime = picked;
+        }
+      });
+    }
+  }
+
+  // 🔔 TOGGLE REMINDER (FIXED)
+  Future<void> toggleReminder(bool value, bool isHydration) async {
+    setState(() {
+      if (isHydration) {
+        hydrationReminder = value;
+      } else {
+        medicationReminder = value;
+      }
+    });
+
+    await saveSettings();
+
+    final time = isHydration ? hydrationTime : medicationTime;
+
+    if (value) {
+      // ✅ NEW CORRECT CALL
+      await NotificationService.scheduleDailyReminder(
+        id: isHydration ? 1 : 2,
+        title: isHydration ? "💧 Drink Water" : "💊 Take Medication",
+        body: isHydration
+            ? "Stay hydrated for better health"
+            : "Time for your medication",
+        hour: time.hour,
+        minute: time.minute,
+      );
+    } else {
+      await NotificationService.cancel(isHydration ? 1 : 2);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    selected = widget.type;
+    loadData();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return Scaffold(
+      drawer: const AppDrawer(),
+
+      appBar: AppBar(
+        title: const Text("Reminders"),
+        backgroundColor: Colors.redAccent,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            'Add Reminder',
-            style: GoogleFonts.nunito(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
 
-          const SizedBox(height: 16),
-
-          ScInput(
-            label: 'Title',
-            placeholder: 'Enter reminder',
-            controller: widget.titleCtrl,
-          ),
-
-          const SizedBox(height: 10),
-
-          ScInput(
-            label: 'Time',
-            placeholder: '08:00',
-            controller: widget.timeCtrl,
-          ),
-
-          const SizedBox(height: 10),
-
-          Wrap(
-            spacing: 8,
-            children: types.map((t) {
-              return ChoiceChip(
-                label: Text(t),
-                selected: selected == t,
-                onSelected: (_) {
-                  setState(() => selected = t);
-                  widget.onTypeChanged(t);
-                },
-              );
-            }).toList(),
+          // 💧 HYDRATION
+          _reminderCard(
+            title: "Hydration Reminder",
+            value: hydrationReminder,
+            time: hydrationTime,
+            onToggle: (val) => toggleReminder(val, true),
+            onTimePick: () => pickTime(true),
           ),
 
           const SizedBox(height: 20),
 
-          ScButton(label: 'Save', onPressed: widget.onSave),
-          ScButton(
-            label: 'Cancel',
-            onPressed: () => Navigator.pop(context),
-            variant: BtnVariant.ghost,
+          // 💊 MEDICATION
+          _reminderCard(
+            title: "Medication Reminder",
+            value: medicationReminder,
+            time: medicationTime,
+            onToggle: (val) => toggleReminder(val, false),
+            onTimePick: () => pickTime(false),
           ),
         ],
+      ),
+    );
+  }
+
+  // 🔥 UI CARD
+  Widget _reminderCard({
+    required String title,
+    required bool value,
+    required TimeOfDay time,
+    required Function(bool) onToggle,
+    required VoidCallback onTimePick,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        title: Text(title),
+        subtitle: Text("Time: ${time.format(context)}"),
+        trailing: Switch(
+          value: value,
+          onChanged: onToggle,
+        ),
+        onTap: onTimePick,
       ),
     );
   }

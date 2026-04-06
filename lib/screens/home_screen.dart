@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../widgets/app_drawer.dart';
+
 import 'hydration_nutrition_screen.dart';
 import 'tracker_screen.dart';
 import 'reminders_screen.dart';
 import 'goals_screen.dart';
 import 'support_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await FirebaseAuth.instance.signOut();
   }
 
-  // ✅ SAVE PAIN LEVEL (FIXED PATH)
+  // ✅ SAVE PAIN LEVEL
   Future<void> savePainLevel(double value) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -36,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await firestore
         .collection('users')
         .doc(uid)
-        .collection('daily') // ✅ FIXED HERE
+        .collection('daily')
         .doc(today)
         .set({
       'painLevel': value,
@@ -51,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
 
-      drawer: _buildDrawer(),
+      // ✅ GLOBAL DRAWER (CLEAN)
+      drawer: const AppDrawer(),
 
       appBar: AppBar(
         backgroundColor: Colors.redAccent,
@@ -64,265 +68,201 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
 
-      // 🔥 REAL-TIME DATA
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: firestore
-            .collection('users')
-            .doc(uid)
-            .collection('daily') // ✅ FIXED HERE
-            .doc(today)
-            .snapshots(),
-        builder: (context, snapshot) {
-          double hydration = 0;
-          double painLevel = 0;
-          int mealsCount = 0;
+      body: uid == null
+          ? const Center(child: Text("User not logged in"))
+          : StreamBuilder<DocumentSnapshot>(
+              stream: firestore
+                  .collection('users')
+                  .doc(uid)
+                  .collection('daily')
+                  .doc(today)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                double hydration = 0;
+                double painLevel = 0;
+                int mealsCount = 0;
 
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final data =
-                snapshot.data!.data() as Map<String, dynamic>;
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  final data =
+                      snapshot.data!.data() as Map<String, dynamic>;
 
-            hydration = (data['hydration'] ?? 0).toDouble();
-            painLevel = (data['painLevel'] ?? 0).toDouble();
-            mealsCount =
-                (data['meals'] as List?)?.length ?? 0;
-          }
+                  hydration = (data['hydration'] ?? 0).toDouble();
+                  painLevel = (data['painLevel'] ?? 0).toDouble();
+                  mealsCount =
+                      (data['meals'] as List?)?.length ?? 0;
+                }
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-
-              // 👋 Welcome
-              const Text(
-                "Welcome back, Warrior 💪",
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 5),
-
-              Text(
-                user?.email ?? "",
-                style: TextStyle(color: Colors.grey[700]),
-              ),
-
-              const SizedBox(height: 20),
-
-              // 📊 STATS
-              Row(
-                children: [
-                  _card(
-                    "Hydration",
-                    "${hydration.toStringAsFixed(1)} L",
-                    Icons.water_drop,
-                  ),
-                  const SizedBox(width: 10),
-                  _card(
-                    "Meals",
-                    "$mealsCount meals",
-                    Icons.restaurant,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  _card(
-                    "Pain",
-                    painLevel.toInt().toString(),
-                    Icons.monitor_heart,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // ❤️ PAIN TRACKER
-              const Text(
-                "How are you feeling today?",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600),
-              ),
-
-              const SizedBox(height: 10),
-
-              Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
+                return ListView(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Pain Level: ${painLevel.toInt()}",
-                        style:
-                            const TextStyle(fontSize: 16),
-                      ),
-                      Slider(
-                        value: painLevel,
-                        min: 0,
-                        max: 10,
-                        divisions: 10,
-                        activeColor: Colors.redAccent,
-                        label:
-                            painLevel.toInt().toString(),
-                        onChanged: (value) {
-                          setState(() {
-                            painLevel = value;
-                          });
-                          savePainLevel(value);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                  children: [
 
-              const SizedBox(height: 20),
+                    // 👋 Welcome
+                    const Text(
+                      "Welcome back, Warrior 💪",
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold),
+                    ),
 
-              // ⚡ QUICK ACTIONS
-              const Text(
-                "Quick Actions",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600),
-              ),
+                    const SizedBox(height: 5),
 
-              const SizedBox(height: 10),
+                    Text(
+                      user?.email ?? "",
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
 
-              GridView.count(
-                shrinkWrap: true,
-                crossAxisCount: 2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                physics:
-                    const NeverScrollableScrollPhysics(),
-                children: [
+                    const SizedBox(height: 20),
 
-                  _actionCard(
-                    "Health",
-                    Icons.favorite,
-                    Colors.blue,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const HydrationNutritionScreen(),
+                    // 📊 STATS
+                    Row(
+                      children: [
+                        _card(
+                          "Hydration",
+                          "${hydration.toStringAsFixed(1)} L",
+                          Icons.water_drop,
                         ),
-                      );
-                    },
-                  ),
+                        const SizedBox(width: 10),
+                        _card(
+                          "Meals",
+                          "$mealsCount meals",
+                          Icons.restaurant,
+                        ),
+                      ],
+                    ),
 
-                  _actionCard(
-                    "Tracker",
-                    Icons.warning,
-                    Colors.red,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const TrackerScreen()),
-                      );
-                    },
-                  ),
+                    const SizedBox(height: 10),
 
-                  _actionCard(
-                    "Reminders",
-                    Icons.alarm,
-                    Colors.orange,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const RemindersScreen()),
-                      );
-                    },
-                  ),
+                    Row(
+                      children: [
+                        _card(
+                          "Pain",
+                          painLevel.toInt().toString(),
+                          Icons.monitor_heart,
+                        ),
+                      ],
+                    ),
 
-                  _actionCard(
-                    "Goals",
-                    Icons.flag,
-                    Colors.green,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const GoalsScreen()),
-                      );
-                    },
-                  ),
+                    const SizedBox(height: 20),
 
-                  _actionCard(
-                    "Support",
-                    Icons.people,
-                    Colors.teal,
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const SupportScreen()),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                    // ❤️ PAIN TRACKER
+                    const Text(
+                      "How are you feeling today?",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600),
+                    ),
 
-              const SizedBox(height: 20),
-            ],
-          );
-        },
-      ),
+                    const SizedBox(height: 10),
+
+                    Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Text(
+                              "Pain Level: ${painLevel.toInt()}",
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            Slider(
+                              value: painLevel,
+                              min: 0,
+                              max: 10,
+                              divisions: 10,
+                              activeColor: Colors.redAccent,
+                              label: painLevel.toInt().toString(),
+                              onChanged: (value) {
+                                setState(() {
+                                  painLevel = value;
+                                });
+                                savePainLevel(value);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ⚡ QUICK ACTIONS
+                    const Text(
+                      "Quick Actions",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      physics:
+                          const NeverScrollableScrollPhysics(),
+                      children: [
+
+                        _actionCard(
+                          "Health",
+                          Icons.favorite,
+                          Colors.blue,
+                          () => _navigate(
+                              const HydrationNutritionScreen()),
+                        ),
+
+                        _actionCard(
+                          "Tracker",
+                          Icons.warning,
+                          Colors.red,
+                          () => _navigate(const TrackerScreen()),
+                        ),
+
+                        _actionCard(
+                          "Reminders",
+                          Icons.alarm,
+                          Colors.orange,
+                          () => _navigate(const RemindersScreen()),
+                        ),
+
+                        _actionCard(
+                          "Goals",
+                          Icons.flag,
+                          Colors.green,
+                          () => _navigate(const GoalsScreen()),
+                        ),
+
+                        _actionCard(
+                          "Support",
+                          Icons.people,
+                          Colors.teal,
+                          () => _navigate(const SupportScreen()),
+                        ),
+
+                        _actionCard(
+                          "Analytics",
+                          Icons.show_chart,
+                          Colors.purple,
+                          () => _navigate(const HistoryScreen()),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+                  ],
+                );
+              },
+            ),
     );
   }
 
-  // 🔥 DRAWER
-  Widget _buildDrawer() {
-    return Drawer(
-      child: ListView(
-        children: [
-          UserAccountsDrawerHeader(
-            accountEmail: Text(user?.email ?? ""),
-            accountName: const Text("SickleCare User"),
-            decoration:
-                const BoxDecoration(color: Colors.redAccent),
-          ),
-
-          _drawerItem("Home", Icons.home, () {
-            Navigator.pop(context);
-          }),
-
-          _drawerItem("Health", Icons.favorite, () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) =>
-                      const HydrationNutritionScreen()),
-            );
-          }),
-
-          _drawerItem("Tracker", Icons.warning, () {}),
-          _drawerItem("Reminders", Icons.alarm, () {}),
-          _drawerItem("Goals", Icons.flag, () {}),
-          _drawerItem("Support", Icons.people, () {}),
-        ],
-      ),
-    );
-  }
-
-  Widget _drawerItem(
-      String title, IconData icon, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      onTap: onTap,
+  // ✅ NAVIGATION
+  void _navigate(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -336,8 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(icon,
-                  size: 30, color: Colors.redAccent),
+              Icon(icon, size: 30, color: Colors.redAccent),
               const SizedBox(height: 10),
               Text(title,
                   style: const TextStyle(
@@ -366,8 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(icon, size: 40, color: color),
               const SizedBox(height: 10),
-              Text(title,
-                  textAlign: TextAlign.center),
+              Text(title, textAlign: TextAlign.center),
             ],
           ),
         ),
