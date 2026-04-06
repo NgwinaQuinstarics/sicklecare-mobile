@@ -1,45 +1,51 @@
-# Miscellaneous
+# ------------------------------
+# OS & Misc
+# ------------------------------
 *.class
 *.log
 *.pyc
 *.swp
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
 
-# IntelliJ / Android Studio related
+# ------------------------------
+# IDEs
+# ------------------------------
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
 
-# VS Code related
-.vscode/
-
-# Flutter / Dart / Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ------------------------------
+# Flutter / Dart
+# ------------------------------
 .dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
+.packages
 .pub/
+.pub-cache/
 build/
 coverage/
 
-# Firebase / Secrets
+# ------------------------------
+# Android / iOS build files
+# ------------------------------
+android/app/debug
+android/app/profile
+android/app/release
+ios/Flutter/.last_build_id
+
+# ------------------------------
+# Firebase (IMPORTANT)
+# ------------------------------
 android/app/google-services.json
-lib/firebase_options.dart
+ios/Runner/GoogleService-Info.plist
 
-# Symbolication / Obfuscation
-app.*.symbols
-app.*.map.json
+# ------------------------------
+# Environment / secrets
+# ------------------------------
+.env
 
-# Android Studio build artifacts
-/android/app/debug
-/android/app/profile
-/android/app/release
+# ------------------------------
+# Optional (keep tracked!)
+# ------------------------------
+# lib/firebase_options.dart   

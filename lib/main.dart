@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'login.dart';
+import 'splash_screen.dart';
+import 'signup.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,10 @@ class SickleCareApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'SickleCare App',
       theme: ThemeData(primarySwatch: Colors.red),
-      home: const LoginScreen(),
+      home: const SplashScreen(),
+      routes: {
+        "/signup": (context) => const SignupScreen(),
+      },
     );
   }
 }
