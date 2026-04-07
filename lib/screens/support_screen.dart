@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../widgets/app_drawer.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -8,183 +12,300 @@ class SupportScreen extends StatefulWidget {
   State<SupportScreen> createState() => _SupportScreenState();
 }
 
-class _SupportScreenState extends State<SupportScreen> {
-  final TextEditingController messageController = TextEditingController();
+class _SupportScreenState extends State<SupportScreen>
+    with SingleTickerProviderStateMixin {
+  final user = FirebaseAuth.instance.currentUser;
+  final firestore = FirebaseFirestore.instance;
 
-  void sendMessage() {
-    if (messageController.text.trim().isEmpty) return;
+  final messageController = TextEditingController();
+  final ScrollController scrollController = ScrollController();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message sent successfully')),
-    );
+  List<Map<String, dynamic>> faqs = [];
+
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    loadFAQs();
+  }
+
+  // ✅ LOAD FAQS (ADMIN CONTROLLED)
+  Future<void> loadFAQs() async {
+    final snapshot = await firestore.collection('faqs').get();
+
+    if (!mounted) return;
+
+    setState(() {
+      faqs = snapshot.docs.map((doc) => doc.data()).toList();
+    });
+  }
+
+  // ✅ UPDATE ANALYTICS
+  Future<void> updateAnalytics({required bool isUser}) async {
+    final uid = user?.uid;
+    if (uid == null) return;
+
+    final ref = firestore.collection('support_analytics').doc(uid);
+
+    await firestore.runTransaction((transaction) async {
+      final doc = await transaction.get(ref);
+
+      int total = 0;
+      int userMsg = 0;
+      int aiMsg = 0;
+
+      if (doc.exists) {
+        total = doc['totalMessages'] ?? 0;
+        userMsg = doc['userMessages'] ?? 0;
+        aiMsg = doc['aiMessages'] ?? 0;
+      }
+
+      total++;
+
+      if (isUser) {
+        userMsg++;
+      } else {
+        aiMsg++;
+      }
+
+      transaction.set(ref, {
+        'totalMessages': total,
+        'userMessages': userMsg,
+        'aiMessages': aiMsg,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  // ✅ SEND MESSAGE
+  Future<void> sendMessage() async {
+    final uid = user?.uid;
+    if (uid == null || messageController.text.trim().isEmpty) return;
+
+    final text = messageController.text.trim();
+
+    // USER MESSAGE
+    await firestore
+        .collection('support_messages')
+        .doc(uid)
+        .collection('messages')
+        .add({
+      'text': text,
+      'isUser': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await updateAnalytics(isUser: true);
 
     messageController.clear();
+
+    // 🤖 AI RESPONSE
+    final aiResponse = generateAIResponse(text);
+
+    await firestore
+        .collection('support_messages')
+        .doc(uid)
+        .collection('messages')
+        .add({
+      'text': aiResponse,
+      'isUser': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await updateAnalytics(isUser: false);
+
+    // AUTO SCROLL
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (scrollController.hasClients) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  // 🤖 SIMPLE AI
+  String generateAIResponse(String input) {
+    input = input.toLowerCase();
+
+    if (input.contains("pain")) {
+      return "Stay hydrated and rest. If pain persists, contact a doctor.";
+    } else if (input.contains("water")) {
+      return "Drink at least 2-3 liters daily to prevent crisis.";
+    } else if (input.contains("food")) {
+      return "Eat balanced meals rich in vitamins.";
+    } else if (input.contains("emergency")) {
+      return "If this is urgent, please use the Emergency tab immediately.";
+    } else {
+      return "Thank you for reaching out. A professional may respond if needed.";
+    }
+  }
+
+  // 🚨 CALL FUNCTION
+  Future<void> callEmergency() async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: '112');
+
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
-        title: const Text("Support"),
-        centerTitle: true,
-        backgroundColor: Colors.blueAccent,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    final uid = user?.uid;
 
-              // HEADER CARD
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.blueAccent,
-                  borderRadius: BorderRadius.circular(16),
+    return Scaffold(
+      drawer: const AppDrawer(),
+
+      appBar: AppBar(
+        title: const Text("Support Center"),
+        backgroundColor: Colors.redAccent,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: "Chat"),
+            Tab(text: "Emergency"),
+            Tab(text: "FAQs"),
+          ],
+        ),
+      ),
+
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+
+          // 💬 CHAT TAB
+          Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: firestore
+                      .collection('support_messages')
+                      .doc(uid)
+                      .collection('messages')
+                      .orderBy('createdAt')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final messages = snapshot.data!.docs;
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(10),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final data =
+                            messages[index].data() as Map<String, dynamic>;
+
+                        final isUser = data['isUser'] ?? false;
+
+                        return Align(
+                          alignment: isUser
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 5),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isUser
+                                  ? Colors.redAccent
+                                  : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              data['text'] ?? '',
+                              style: TextStyle(
+                                color: isUser
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
+              ),
+
+              // INPUT
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   children: [
-                    const Icon(Icons.support_agent,
-                        size: 40, color: Colors.white),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        "Need Help?\nWe are here for you 24/7",
-                        style: GoogleFonts.nunito(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                      child: TextField(
+                        controller: messageController,
+                        decoration: const InputDecoration(
+                          hintText: "Type your message...",
+                          border: OutlineInputBorder(),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 5),
+                    IconButton(
+                      icon: const Icon(Icons.send, color: Colors.redAccent),
+                      onPressed: sendMessage,
+                    )
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // QUICK ACTIONS
-              Text(
-                "Quick Help",
-                style: GoogleFonts.nunito(
-                    fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _quickCard(Icons.help_outline, "FAQs"),
-                  _quickCard(Icons.local_hospital, "Emergency"),
-                  _quickCard(Icons.chat, "Live Chat"),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // CONTACT FORM
-              Text(
-                "Contact Support",
-                style: GoogleFonts.nunito(
-                    fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-
-              Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: messageController,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          hintText: "Describe your issue...",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: sendMessage,
-                        icon: const Icon(Icons.send),
-                        label: const Text("Send Message"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          minimumSize: const Size(double.infinity, 50),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // CONTACT INFO
-              Text(
-                "Other Ways to Reach Us",
-                style: GoogleFonts.nunito(
-                    fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 10),
-
-              _contactTile(Icons.email, "support@sicklecare.com"),
-              _contactTile(Icons.phone, "+237 6XX XXX XXX"),
-              _contactTile(Icons.location_on, "Douala, Cameroon"),
+              )
             ],
           ),
-        ),
-      ),
-    );
-  }
 
-  // QUICK CARD
-  Widget _quickCard(IconData icon, String title) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            )
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 30, color: Colors.blueAccent),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: GoogleFonts.nunito(
-                  fontSize: 12, fontWeight: FontWeight.w800),
+          // 🚨 EMERGENCY TAB
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.warning, size: 80, color: Colors.red),
+                const SizedBox(height: 20),
+                const Text(
+                  "Emergency Help",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Text("Call emergency services immediately"),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: callEmergency,
+                  icon: const Icon(Icons.call),
+                  label: const Text("Call Now"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 15),
+                  ),
+                )
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
+          ),
 
-  // CONTACT TILE
-  Widget _contactTile(IconData icon, String text) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.blueAccent),
-      title: Text(
-        text,
-        style: GoogleFonts.dmSans(fontSize: 13),
+          // ❓ FAQ TAB
+          ListView(
+            padding: const EdgeInsets.all(16),
+            children: faqs.map((faq) {
+              return Card(
+                child: ExpansionTile(
+                  title: Text(faq['question'] ?? ''),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(faq['answer'] ?? ''),
+                    )
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

@@ -18,6 +18,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   List<FlSpot> painSpots = [];
   List<FlSpot> hydrationSpots = [];
+  List<FlSpot> adherenceSpots = [];
+
   List<Map<String, dynamic>> logs = [];
 
   Future<void> loadHistory() async {
@@ -31,38 +33,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .orderBy('updatedAt')
         .get();
 
-    List<FlSpot> pain = [];
-    List<FlSpot> water = [];
-    List<Map<String, dynamic>> tempLogs = [];
-
     int index = 0;
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
 
-      final painLevel = (data['painLevel'] ?? 0).toDouble();
-      final hydration = (data['hydration'] ?? 0).toDouble();
+      final pain = (data['painLevel'] ?? 0).toDouble();
+      final water = (data['hydration'] ?? 0).toDouble();
 
-      pain.add(FlSpot(index.toDouble(), painLevel));
-      water.add(FlSpot(index.toDouble(), hydration));
+      final reminders = List<Map<String, dynamic>>.from(
+        data['reminders'] ?? [],
+      );
 
-      tempLogs.add({
+      int completed = reminders.where((r) => r['completed'] == true).length;
+      int total = reminders.length;
+
+      double adherence = total == 0 ? 0 : (completed / total) * 10;
+
+      painSpots.add(FlSpot(index.toDouble(), pain));
+      hydrationSpots.add(FlSpot(index.toDouble(), water));
+      adherenceSpots.add(FlSpot(index.toDouble(), adherence));
+
+      logs.add({
         'date': doc.id,
-        'pain': painLevel,
-        'hydration': hydration,
-        'meals': (data['meals'] as List?)?.length ?? 0,
+        'pain': pain,
+        'hydration': water,
+        'adherence': adherence.toStringAsFixed(1),
       });
 
       index++;
     }
 
     if (!mounted) return;
-
-    setState(() {
-      painSpots = pain;
-      hydrationSpots = water;
-      logs = tempLogs;
-    });
+    setState(() {});
   }
 
   @override
@@ -87,17 +90,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: const EdgeInsets.all(16),
               children: [
 
-                // 📈 PAIN CHART
                 _buildChart("Pain Trend", painSpots),
-
                 const SizedBox(height: 20),
 
-                // 💧 HYDRATION CHART
                 _buildChart("Hydration Trend", hydrationSpots),
-
                 const SizedBox(height: 20),
 
-                // 📅 HISTORY LIST
+                _buildChart("Reminder Adherence", adherenceSpots),
+                const SizedBox(height: 20),
+
                 const Text(
                   "History",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -106,13 +107,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 const SizedBox(height: 10),
 
                 ...logs.map((log) => Card(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
                       child: ListTile(
-                        leading: const Icon(Icons.calendar_today),
                         title: Text(log['date']),
                         subtitle: Text(
-                          "Pain: ${log['pain']} | Water: ${log['hydration']}L | Meals: ${log['meals']}",
+                          "Pain: ${log['pain']} | Water: ${log['hydration']}L | Adherence: ${log['adherence']}/10",
                         ),
                       ),
                     )),
@@ -121,15 +119,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // 🔥 CLEAN CHART UI
   Widget _buildChart(String title, List<FlSpot> spots) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        Text(title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
 
         const SizedBox(height: 10),
 
