@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'auth_wrapper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'login.dart';
+import 'screens/home_screen.dart';
+import 'screens/admin/admin_dashboard.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,17 +18,48 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _startApp();
+    _initApp();
   }
 
-  Future<void> _startApp() async {
-    await Future.delayed(const Duration(seconds: 3));
+  Future<void> _initApp() async {
+    await Future.delayed(const Duration(seconds: 2)); // splash delay
 
+    final user = FirebaseAuth.instance.currentUser;
+
+    // ❌ Not logged in → Login
+    if (user == null) {
+      _goTo(const LoginScreen());
+      return;
+    }
+
+    try {
+      // 🔐 Check admin role
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(user.uid)
+          .get();
+
+      if (!mounted) return;
+
+      if (adminDoc.exists) {
+        _goTo(const AdminDashboard());
+      } else {
+        _goTo(const HomeScreen());
+      }
+
+    } catch (e) {
+      // ❌ If Firestore fails → fallback
+      if (!mounted) return;
+      _goTo(const HomeScreen());
+    }
+  }
+
+  void _goTo(Widget screen) {
     if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -31,25 +67,22 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.redAccent,
-      body: Center(
+      body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.favorite, size: 80, color: Colors.white),
+          children: [
+            Icon(Icons.favorite, color: Colors.white, size: 80),
             SizedBox(height: 20),
             Text(
               "SickleCare",
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 10),
-            Text(
-              "Caring for warriors ❤️",
-              style: TextStyle(color: Colors.white70),
-            ),
+            SizedBox(height: 20),
+            CircularProgressIndicator(color: Colors.white),
           ],
         ),
       ),

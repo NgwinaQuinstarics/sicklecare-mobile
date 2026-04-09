@@ -31,18 +31,26 @@ class _SupportScreenState extends State<SupportScreen>
     loadFAQs();
   }
 
-  // ✅ LOAD FAQS (ADMIN CONTROLLED)
+  // ✅ LOAD FAQS (FIXED)
   Future<void> loadFAQs() async {
-    final snapshot = await firestore.collection('faqs').get();
+    try {
+      final snapshot = await firestore
+          .collection('admin')
+          .doc('faqs')
+          .collection('items')
+          .get(); // ✅ FIX
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      faqs = snapshot.docs.map((doc) => doc.data()).toList();
-    });
+      setState(() {
+        faqs = snapshot.docs.map((doc) => doc.data()).toList();
+      });
+    } catch (e) {
+      debugPrint("FAQ Load Error: $e");
+    }
   }
 
-  // ✅ UPDATE ANALYTICS
+  // ✅ ANALYTICS
   Future<void> updateAnalytics({required bool isUser}) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -52,15 +60,9 @@ class _SupportScreenState extends State<SupportScreen>
     await firestore.runTransaction((transaction) async {
       final doc = await transaction.get(ref);
 
-      int total = 0;
-      int userMsg = 0;
-      int aiMsg = 0;
-
-      if (doc.exists) {
-        total = doc['totalMessages'] ?? 0;
-        userMsg = doc['userMessages'] ?? 0;
-        aiMsg = doc['aiMessages'] ?? 0;
-      }
+      int total = doc.data()?['totalMessages'] ?? 0;
+      int userMsg = doc.data()?['userMessages'] ?? 0;
+      int aiMsg = doc.data()?['aiMessages'] ?? 0;
 
       total++;
 
@@ -86,37 +88,44 @@ class _SupportScreenState extends State<SupportScreen>
 
     final text = messageController.text.trim();
 
-    // USER MESSAGE
-    await firestore
-        .collection('support_messages')
-        .doc(uid)
-        .collection('messages')
-        .add({
-      'text': text,
-      'isUser': true,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      // USER MESSAGE
+      await firestore
+          .collection('support_messages')
+          .doc(uid)
+          .collection('messages')
+          .add({
+        'text': text,
+        'isUser': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    await updateAnalytics(isUser: true);
+      await updateAnalytics(isUser: true);
 
-    messageController.clear();
+      messageController.clear();
 
-    // 🤖 AI RESPONSE
-    final aiResponse = generateAIResponse(text);
+      // 🤖 AI RESPONSE
+      final aiResponse = generateAIResponse(text);
 
-    await firestore
-        .collection('support_messages')
-        .doc(uid)
-        .collection('messages')
-        .add({
-      'text': aiResponse,
-      'isUser': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+      await firestore
+          .collection('support_messages')
+          .doc(uid)
+          .collection('messages')
+          .add({
+        'text': aiResponse,
+        'isUser': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    await updateAnalytics(isUser: false);
+      await updateAnalytics(isUser: false);
 
-    // AUTO SCROLL
+      _scrollToBottom();
+    } catch (e) {
+      debugPrint("Send Error: $e");
+    }
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 300), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
@@ -128,24 +137,24 @@ class _SupportScreenState extends State<SupportScreen>
     });
   }
 
-  // 🤖 SIMPLE AI
+  // 🤖 AI
   String generateAIResponse(String input) {
     input = input.toLowerCase();
 
     if (input.contains("pain")) {
       return "Stay hydrated and rest. If pain persists, contact a doctor.";
     } else if (input.contains("water")) {
-      return "Drink at least 2-3 liters daily to prevent crisis.";
+      return "Drink at least 2–3 liters daily to prevent crisis.";
     } else if (input.contains("food")) {
       return "Eat balanced meals rich in vitamins.";
     } else if (input.contains("emergency")) {
-      return "If this is urgent, please use the Emergency tab immediately.";
+      return "If urgent, go to the Emergency tab immediately.";
     } else {
-      return "Thank you for reaching out. A professional may respond if needed.";
+      return "Thanks for your message. A professional may respond if needed.";
     }
   }
 
-  // 🚨 CALL FUNCTION
+  // 🚨 CALL
   Future<void> callEmergency() async {
     final Uri phoneUri = Uri(scheme: 'tel', path: '112');
 
@@ -178,7 +187,7 @@ class _SupportScreenState extends State<SupportScreen>
         controller: _tabController,
         children: [
 
-          // 💬 CHAT TAB
+          // 💬 CHAT
           Column(
             children: [
               Expanded(
@@ -195,6 +204,12 @@ class _SupportScreenState extends State<SupportScreen>
                     }
 
                     final messages = snapshot.data!.docs;
+
+                    if (messages.isEmpty) {
+                      return const Center(
+                        child: Text("Start a conversation 👋"),
+                      );
+                    }
 
                     return ListView.builder(
                       controller: scrollController,
@@ -237,7 +252,7 @@ class _SupportScreenState extends State<SupportScreen>
 
               // INPUT
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.all(10),
                 child: Row(
                   children: [
                     Expanded(
@@ -260,7 +275,7 @@ class _SupportScreenState extends State<SupportScreen>
             ],
           ),
 
-          // 🚨 EMERGENCY TAB
+          // 🚨 EMERGENCY
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -288,23 +303,25 @@ class _SupportScreenState extends State<SupportScreen>
             ),
           ),
 
-          // ❓ FAQ TAB
-          ListView(
-            padding: const EdgeInsets.all(16),
-            children: faqs.map((faq) {
-              return Card(
-                child: ExpansionTile(
-                  title: Text(faq['question'] ?? ''),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(faq['answer'] ?? ''),
-                    )
-                  ],
+          // ❓ FAQ
+          faqs.isEmpty
+              ? const Center(child: Text("No FAQs available"))
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: faqs.map((faq) {
+                    return Card(
+                      child: ExpansionTile(
+                        title: Text(faq['question'] ?? ''),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(faq['answer'] ?? ''),
+                          )
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
         ],
       ),
     );

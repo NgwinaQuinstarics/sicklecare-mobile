@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/home_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -11,157 +12,123 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  final confirmPasswordController = TextEditingController();
+
+  final _formKey = GlobalKey<FormState>();
 
   bool isLoading = false;
+  bool obscure = true;
 
   Future<void> signup() async {
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.trim().isEmpty ||
-        confirmPasswordController.text.trim().isEmpty) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("All fields are required")),
-      );
-      return;
-    }
-
-    if (passwordController.text.trim() !=
-        confirmPasswordController.text.trim()) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match")),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => isLoading = true);
 
     try {
-      // 🔥 NO navigation here
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-    } on FirebaseAuthException catch (e) {
+
       if (!mounted) return;
 
-      String message;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = "Signup failed";
 
-      switch (e.code) {
-        case 'email-already-in-use':
-          message = "This email is already registered";
-          break;
-        case 'weak-password':
-          message = "Password should be at least 6 characters";
-          break;
-        case 'invalid-email':
-          message = "Invalid email format";
-          break;
-        default:
-          message = "Signup failed: ${e.message}";
+      if (e.code == 'email-already-in-use') {
+        message = "Email already in use";
+      } else if (e.code == 'weak-password') {
+        message = "Password is too weak";
       }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Something went wrong")),
-      );
     } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
     }
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
+      backgroundColor: Colors.grey[100],
+
+      body: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                const Icon(Icons.person_add, size: 60, color: Colors.redAccent),
-                const SizedBox(height: 10),
-                const Text(
-                  "Sign Up",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 30),
-
-                _field(emailController, "Email", Icons.email),
-                const SizedBox(height: 15),
-
-                _field(passwordController, "Password", Icons.lock, obscure: true),
-                const SizedBox(height: 15),
-
-                _field(confirmPasswordController, "Confirm Password", Icons.lock, obscure: true),
-                const SizedBox(height: 20),
-
-                ElevatedButton(
-                  onPressed: isLoading ? null : signup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  child: isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Sign Up"),
-                ),
-
-                const SizedBox(height: 15),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          child: Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    const Text("Already have an account? "),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Text(
-                        "Login",
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
+
+                    const Text(
+                      "Create Account 🚀",
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: "Email",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) =>
+                          value!.isEmpty ? "Enter email" : null,
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscure,
+                      decoration: InputDecoration(
+                        labelText: "Password",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscure
+                              ? Icons.visibility
+                              : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() => obscure = !obscure);
+                          },
                         ),
+                      ),
+                      validator: (value) =>
+                          value!.length < 6 ? "Min 6 characters" : null,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : signup,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text("Sign Up"),
                       ),
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController controller, String label, IconData icon,
-      {bool obscure = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType:
-          label == "Email" ? TextInputType.emailAddress : TextInputType.text,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'screens/home_screen.dart';
+import 'screens/admin/admin_dashboard.dart';
+import 'signup.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,143 +16,163 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+
+  final _formKey = GlobalKey<FormState>();
+
   bool isLoading = false;
+  bool obscure = true;
 
+  // ✅ LOGIN FUNCTION (UPDATED)
   Future<void> login() async {
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.trim().isEmpty) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter email and password")),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => isLoading = true);
 
     try {
-      // 🔥 NO navigation here
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-    } on FirebaseAuthException catch (e) {
+
+      final uid = credential.user?.uid;
+
+      if (uid == null) return;
+
+      // 🔐 CHECK ADMIN ROLE
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(uid)
+          .get();
+
       if (!mounted) return;
 
-      String message;
+      // 🚀 NAVIGATION BASED ON ROLE
+      if (adminDoc.exists) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
 
-      switch (e.code) {
-        case 'user-not-found':
-          message = "No user found with this email";
-          break;
-        case 'wrong-password':
-          message = "Incorrect password";
-          break;
-        case 'invalid-email':
-          message = "Invalid email format";
-          break;
-        case 'user-disabled':
-          message = "This account has been disabled";
-          break;
-        default:
-          message = "Login failed: ${e.message}";
+    } on FirebaseAuthException catch (e) {
+      String message = "Login failed";
+
+      if (e.code == 'user-not-found') {
+        message = "No user found for that email";
+      } else if (e.code == 'wrong-password') {
+        message = "Incorrect password";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email format";
       }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
-      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Something went wrong")),
-      );
     } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
     }
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
+      backgroundColor: Colors.grey[100],
+
+      body: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                const Icon(Icons.lock, size: 60, color: Colors.redAccent),
-                const SizedBox(height: 10),
-                const Text(
-                  "Login",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 30),
-
-                _field(emailController, "Email", Icons.email),
-                const SizedBox(height: 15),
-
-                _field(passwordController, "Password", Icons.lock, obscure: true),
-                const SizedBox(height: 20),
-
-                ElevatedButton(
-                  onPressed: isLoading ? null : login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  child: isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Login"),
-                ),
-
-                const SizedBox(height: 15),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          child: Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    const Text("Don't have an account? "),
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, "/signup"),
-                      child: const Text(
-                        "Sign Up",
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
+
+                    const Text(
+                      "Welcome Back 👋",
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // EMAIL
+                    TextFormField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: "Email",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) =>
+                          value!.isEmpty ? "Enter email" : null,
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    // PASSWORD
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscure,
+                      decoration: InputDecoration(
+                        labelText: "Password",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscure
+                              ? Icons.visibility
+                              : Icons.visibility_off),
+                          onPressed: () {
+                            setState(() => obscure = !obscure);
+                          },
                         ),
                       ),
+                      validator: (value) =>
+                          value!.length < 6 ? "Min 6 characters" : null,
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // LOGIN BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text("Login"),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SignupScreen()),
+                        );
+                      },
+                      child: const Text("Don't have an account? Sign up"),
+                    )
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController controller, String label, IconData icon,
-      {bool obscure = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType:
-          label == "Email" ? TextInputType.emailAddress : TextInputType.text,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
