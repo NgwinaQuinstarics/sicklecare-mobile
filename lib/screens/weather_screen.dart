@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -13,21 +14,19 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  final String apiKey = "dd211ba3e0176d8198fce34c96413e3c";
+  final String apiKey = "dd211ba3e0176d8198fce34c96413e3c"; 
 
   String city = "";
   double temp = 0;
   String condition = "";
   String icon = "";
 
-  List hourlyTemps = [];
-  List dailyTemps = [];
+  List<double> hourlyTemps = [];
+  List<double> dailyTemps = [];
 
   bool isLoading = false;
 
-  // 🇨🇲 FULL CAMEROON LIST
   final List<String> locations = [
-    // Regions capitals
     "Douala",
     "Yaounde",
     "Bamenda",
@@ -38,8 +37,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     "Ebolowa",
     "Bertoua",
     "Bafoussam",
-
-    // towns
     "Limbe",
     "Kribi",
     "Kumba",
@@ -59,12 +56,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
     fetchWeather(selectedCity);
   }
 
-  // 🌍 FETCH FULL DATA (current + forecast)
   Future<void> fetchWeather(String location) async {
     setState(() => isLoading = true);
 
     try {
-      // CURRENT
       final currentUrl =
           "https://api.openweathermap.org/data/2.5/weather?q=$location,CM&appid=$apiKey&units=metric";
 
@@ -79,10 +74,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
         final current = jsonDecode(currentRes.body);
         final forecast = jsonDecode(forecastRes.body);
 
-        // HOURLY (next 8 = ~24h)
         List hourly = forecast['list'].take(8).toList();
 
-        // DAILY (every 8 = 24h)
         List daily = [];
         for (int i = 0; i < forecast['list'].length; i += 8) {
           daily.add(forecast['list'][i]);
@@ -101,7 +94,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               daily.map((e) => (e['main']['temp'] as num).toDouble()).toList();
         });
       } else {
-        showMessage("Error loading weather");
+        showMessage("Failed to load weather");
       }
     } catch (e) {
       showMessage("Network error");
@@ -115,20 +108,34 @@ class _WeatherScreenState extends State<WeatherScreen> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // 🎨 GRADIENT
+  // 🎨 APP THEME GRADIENT
   LinearGradient gradient() {
     if (condition.toLowerCase().contains("rain")) {
       return const LinearGradient(
-          colors: [Colors.blueGrey, Colors.black]);
+        colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
     }
+
     return const LinearGradient(
-        colors: [Colors.blue, Colors.deepPurple]);
+      colors: [Color.fromARGB(255, 89, 74, 74), Color.fromARGB(255, 100, 136, 244)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: const AppDrawer(),
+
+      appBar: AppBar(
+        title: const Text("Weather"),
+        backgroundColor: Colors.redAccent,
+        elevation: 0,
+      ),
+
       body: Container(
         decoration: BoxDecoration(gradient: gradient()),
         child: SafeArea(
@@ -137,20 +144,20 @@ class _WeatherScreenState extends State<WeatherScreen> {
             child: ListView(
               children: [
 
-                // HEADER
+                // LOCATION SELECTOR
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Weather",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold)),
-
+                    const Text(
+                      "Current Location",
+                      style: TextStyle(
+                          color: Colors.white70, fontSize: 16),
+                    ),
                     DropdownButton<String>(
                       value: selectedCity,
                       dropdownColor: Colors.black,
                       style: const TextStyle(color: Colors.white),
+                      underline: Container(),
                       items: locations.map((loc) {
                         return DropdownMenuItem(
                           value: loc,
@@ -167,37 +174,54 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
 
                 if (isLoading)
                   const Center(child: CircularProgressIndicator()),
 
                 if (!isLoading && city.isNotEmpty) ...[
 
-                  // CURRENT
-                  Text(city,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 26)),
+                  // MAIN WEATHER CARD
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(city,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold)),
 
-                  Row(
-                    children: [
-                      Image.network(
-                          "https://openweathermap.org/img/wn/$icon@2x.png"),
-                      Text("${temp.toStringAsFixed(1)}°C",
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 40))
-                    ],
+                        const SizedBox(height: 10),
+
+                        Image.network(
+                            "https://openweathermap.org/img/wn/$icon@2x.png"),
+
+                        Text("${temp.toStringAsFixed(1)}°C",
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 42,
+                                fontWeight: FontWeight.bold)),
+
+                        Text(condition,
+                            style: const TextStyle(
+                                color: Colors.white70)),
+                      ],
+                    ),
                   ),
 
-                  Text(condition,
-                      style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 30),
 
-                  const SizedBox(height: 20),
-
-                  // 📊 HOURLY GRAPH
-                  const Text("Hourly",
+                  // HOURLY GRAPH
+                  const Text("24h Temperature",
                       style:
                           TextStyle(color: Colors.white, fontSize: 18)),
+
+                  const SizedBox(height: 10),
 
                   SizedBox(
                     height: 200,
@@ -205,6 +229,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       LineChartData(
                         borderData: FlBorderData(show: false),
                         titlesData: FlTitlesData(show: false),
+                        gridData: FlGridData(show: false),
                         lineBarsData: [
                           LineChartBarData(
                             spots: List.generate(
@@ -212,16 +237,18 @@ class _WeatherScreenState extends State<WeatherScreen> {
                               (i) => FlSpot(i.toDouble(), hourlyTemps[i]),
                             ),
                             isCurved: true,
-                            dotData: FlDotData(show: true),
+                            barWidth: 3,
+                            color: Colors.white,
+                            dotData: FlDotData(show: false),
                           )
                         ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 30),
 
-                  // 📅 7 DAY FORECAST
+                  // DAILY FORECAST
                   const Text("7-Day Forecast",
                       style:
                           TextStyle(color: Colors.white, fontSize: 18)),
@@ -230,10 +257,17 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
                   ...List.generate(dailyTemps.length, (i) {
                     return Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: ListTile(
+                        leading: const Icon(Icons.calendar_today),
                         title: Text("Day ${i + 1}"),
                         trailing: Text(
-                            "${dailyTemps[i].toStringAsFixed(1)}°C"),
+                          "${dailyTemps[i].toStringAsFixed(1)}°C",
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold),
+                        ),
                       ),
                     );
                   })

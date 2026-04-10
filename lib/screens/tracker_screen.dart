@@ -134,7 +134,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
                         min: 0,
                         max: 10,
                         divisions: 10,
-                        activeColor: Colors.redAccent,
+                        activeColor: const Color.fromARGB(255, 11, 68, 182),
                         onChanged: (value) {
                           setState(() {
                             painLevel = value.toInt();
