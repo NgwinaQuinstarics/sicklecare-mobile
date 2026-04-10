@@ -1,177 +1,253 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../constants/app_colors.dart';
-import '../models/goal_model.dart';
-import '../store/app_state.dart';
-import '../widgets/sc_card.dart';
-import '../widgets/sc_button.dart';
-import '../widgets/sc_input.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class GoalsScreen extends StatelessWidget {
+import '../widgets/app_drawer.dart';
+
+class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
 
-  static const _catColor = {
-    'hydration': AppColors.teal,   'medication': AppColors.blue,
-    'exercise':  AppColors.purple, 'sleep': AppColors.amber,
-    'nutrition': AppColors.green,
-  };
-
   @override
-  Widget build(BuildContext context) {
-    final store = context.watch<GoalProvider>();
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Health Goals 🎯', style: GoogleFonts.nunito(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.navy)),
-                Text('${store.completed} of ${store.all.length} completed',
-                  style: GoogleFonts.dmSans(fontSize: 11, color: AppColors.muted)),
-              ]),
-              GestureDetector(
-                onTap: () => _showAddGoal(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                  decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(12)),
-                  child: Text('＋ Add', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-                ),
-              ),
-            ]),
-          ),
-
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
-              child: Column(children: [
-
-                // WEEKLY HERO
-                Container(
-                  width: double.infinity, padding: const EdgeInsets.all(22),
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.navy, borderRadius: BorderRadius.circular(22)),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('WEEKLY COMPLETION', style: GoogleFonts.nunito(
-                      fontSize: 11, fontWeight: FontWeight.w700,
-                      color: Colors.white60, letterSpacing: 0.6)),
-                    Text('${(store.weeklyPct * 100).round()}%',
-                      style: GoogleFonts.nunito(fontSize: 48, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1)),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: store.weeklyPct, minHeight: 8,
-                        backgroundColor: Colors.white,
-                        valueColor: const AlwaysStoppedAnimation(Color(0xFF4DFFD4)),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Keep it up! Consistency prevents crises.',
-                      style: GoogleFonts.dmSans(fontSize: 12, color: Colors.white54)),
-                  ]),
-                ),
-
-                Text('Active Goals',
-                  style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.navy)),
-                const SizedBox(height: 12),
-
-                ScCard(
-                  child: Column(children: store.all.asMap().entries.map((e) {
-                    final goal = e.value;
-                    final color = _catColor[goal.category] ?? AppColors.blue;
-                    return Column(children: [
-                      _GoalRow(goal: goal, color: color),
-                      if (e.key < store.all.length - 1)
-                        const Divider(color: AppColors.border, height: 20),
-                    ]);
-                  }).toList()),
-                ),
-              ]),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  void _showAddGoal(BuildContext context) {
-    final titleCtrl = TextEditingController();
-    final targetCtrl = TextEditingController();
-    showModalBottomSheet(
-      context: context, isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 36),
-        decoration: const BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 20),
-          Text('New Health Goal', style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.navy)),
-          const SizedBox(height: 18),
-          ScInput(label: 'Goal Description', placeholder: 'e.g. Drink 10 glasses/day', controller: titleCtrl),
-          ScInput(label: 'Target Value', placeholder: 'e.g. 10', controller: targetCtrl, keyboardType: TextInputType.number),
-          ScButton(
-            label: 'Create Goal',
-            onPressed: () {
-              if (titleCtrl.text.trim().isEmpty) return;
-              context.read<GoalProvider>().add(GoalModel(
-                id: DateTime.now().millisecondsSinceEpoch,
-                title: titleCtrl.text.trim(),
-                category: 'hydration',
-                targetValue: double.tryParse(targetCtrl.text) ?? 1,
-                currentValue: 0, unit: 'times', frequency: 'daily',
-              ));
-              Navigator.pop(context);
-            },
-          ),
-          const SizedBox(height: 8),
-          ScButton(label: 'Cancel', onPressed: () => Navigator.pop(context), variant: BtnVariant.ghost),
-        ]),
-      ),
-    );
-  }
+  State<GoalsScreen> createState() => _GoalsScreenState();
 }
 
-class _GoalRow extends StatelessWidget {
-  final GoalModel goal;
-  final Color color;
-  const _GoalRow({required this.goal, required this.color});
+class _GoalsScreenState extends State<GoalsScreen> {
+  final user = FirebaseAuth.instance.currentUser;
+  final firestore = FirebaseFirestore.instance;
+
+  double waterGoal = 2.5;
+  int mealsGoal = 3;
+  int painGoal = 3;
+
+  double currentWater = 0;
+  int currentMeals = 0;
+  double currentPain = 0;
+
+  String get today {
+    final now = DateTime.now();
+    return "${now.year}-${now.month}-${now.day}";
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadGoals();
+    loadTodayData();
+  }
+
+  // ✅ LOAD GOALS
+  Future<void> loadGoals() async {
+    final uid = user?.uid;
+    if (uid == null) return;
+
+    final doc = await firestore.collection('goals').doc(uid).get();
+
+    if (doc.exists && mounted) {
+      setState(() {
+        waterGoal = (doc['waterGoal'] ?? 2.5).toDouble();
+        mealsGoal = doc['mealsGoal'] ?? 3;
+        painGoal = doc['painGoal'] ?? 3;
+      });
+    }
+  }
+
+  // ✅ LOAD TODAY DATA
+  Future<void> loadTodayData() async {
+    final uid = user?.uid;
+    if (uid == null) return;
+
+    final doc = await firestore
+        .collection('users')
+        .doc(uid)
+        .collection('daily')
+        .doc(today)
+        .get();
+
+    if (doc.exists && mounted) {
+      setState(() {
+        currentWater = (doc['hydration'] ?? 0).toDouble();
+        currentMeals = (doc['meals'] as List?)?.length ?? 0;
+        currentPain = (doc['painLevel'] ?? 0).toDouble();
+      });
+    }
+  }
+
+  // ✅ SAVE GOALS
+  Future<void> saveGoals() async {
+    final uid = user?.uid;
+    if (uid == null) return;
+
+    await firestore.collection('goals').doc(uid).set({
+      'waterGoal': waterGoal,
+      'mealsGoal': mealsGoal,
+      'painGoal': painGoal,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Goals saved ✅")),
+    );
+  }
+
+  double progress(double current, double goal) {
+    if (goal == 0) return 0;
+    return (current / goal).clamp(0.0, 1.0);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pct = (goal.percentage * 100).round();
-    return Column(children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Row(children: [
-          Text(goal.categoryEmoji, style: const TextStyle(fontSize: 18)),
-          const SizedBox(width: 8),
-          Text(goal.title, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.navy)),
-        ]),
-        Text('$pct%', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
-      ]),
-      const SizedBox(height: 8),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(5),
-        child: LinearProgressIndicator(
-          value: goal.percentage, minHeight: 10,
-          backgroundColor: AppColors.border,
-          valueColor: AlwaysStoppedAnimation(color),
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text("Goals & Progress"),
+        backgroundColor: Colors.redAccent,
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await loadGoals();
+          await loadTodayData();
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+
+            const Text(
+              "Daily Goals",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(height: 15),
+
+            // 💧 WATER
+            _goalCard(
+              "Hydration",
+              "$currentWater / $waterGoal L",
+              progress(currentWater, waterGoal),
+              Icons.water_drop,
+              Colors.blue,
+            ),
+
+            Slider(
+              value: waterGoal,
+              min: 1,
+              max: 5,
+              divisions: 8,
+              label: waterGoal.toStringAsFixed(1),
+              onChanged: (v) => setState(() => waterGoal = v),
+            ),
+
+            const SizedBox(height: 10),
+
+            // 🍽 MEALS (FIXED HERE)
+            _goalCard(
+              "Meals",
+              "$currentMeals / $mealsGoal",
+              progress(
+                currentMeals.toDouble(),
+                mealsGoal.toDouble(),
+              ),
+              Icons.restaurant,
+              Colors.green,
+            ),
+
+            Slider(
+              value: mealsGoal.toDouble(),
+              min: 1,
+              max: 6,
+              divisions: 5,
+              label: mealsGoal.toString(),
+              onChanged: (v) => setState(() => mealsGoal = v.toInt()),
+            ),
+
+            const SizedBox(height: 10),
+
+            // ❤️ PAIN
+            _goalCard(
+              "Pain Control (Lower is better)",
+              "$currentPain / $painGoal",
+              1 - progress(currentPain, painGoal.toDouble()),
+              Icons.monitor_heart,
+              Colors.red,
+            ),
+
+            Slider(
+              value: painGoal.toDouble(),
+              min: 1,
+              max: 10,
+              divisions: 9,
+              label: painGoal.toString(),
+              onChanged: (v) => setState(() => painGoal = v.toInt()),
+            ),
+
+            const SizedBox(height: 20),
+
+            ElevatedButton(
+              onPressed: saveGoals,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text("Save Goals"),
+            ),
+
+            const SizedBox(height: 20),
+
+            _insightCard(),
+          ],
         ),
       ),
-      const SizedBox(height: 5),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('${goal.currentValue.toInt()} / ${goal.targetValue.toInt()} ${goal.unit}',
-          style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.muted)),
-        Text(goal.frequency, style: GoogleFonts.dmSans(fontSize: 10, color: AppColors.muted)),
-      ]),
-    ]);
+    );
+  }
+
+  Widget _goalCard(String title, String subtitle, double value,
+      IconData icon, Color color) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color),
+                const SizedBox(width: 10),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(subtitle),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _insightCard() {
+    String message = "You're doing well 👍";
+
+    if (currentWater < waterGoal * 0.5) {
+      message = "Increase water intake 💧";
+    } else if (currentMeals < mealsGoal) {
+      message = "Try to eat more balanced meals 🍽";
+    } else if (currentPain > painGoal) {
+      message = "High pain detected — rest & hydrate ❤️";
+    }
+
+    return Card(
+      color: Colors.yellow[100],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          "Insight: $message",
+          style: const TextStyle(fontSize: 16),
+        ),
+      ),
+    );
   }
 }

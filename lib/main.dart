@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'firebase_options.dart';
-
+import 'screens/auth_wrapper.dart';
 import 'services/notification_service.dart';
-import 'splash_screen.dart';
-import 'signup.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // ✅ Initialize Firebase
   await Firebase.initializeApp(
@@ -27,18 +30,12 @@ class SickleCareApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'SickleCare App',
+      title: 'SickleCare',
       theme: ThemeData(
         primarySwatch: Colors.red,
+        scaffoldBackgroundColor: Colors.grey[100],
       ),
-
-      // ✅ First screen
-      home: const SplashScreen(),
-
-      // ✅ Routes
-      routes: {
-        "/signup": (context) => const SignupScreen(),
-      },
+      home: const AuthWrapper(),
     );
   }
 }

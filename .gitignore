@@ -46,6 +46,12 @@ ios/Runner/GoogleService-Info.plist
 .env
 
 # ------------------------------
+# flutter dependencies / secrets
+# ------------------------------
+
+.flutter-plugins-dependencies
+
+# ------------------------------
 # Optional (keep tracked!)
 # ------------------------------
 # lib/firebase_options.dart   

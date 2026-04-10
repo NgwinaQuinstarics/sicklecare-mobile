@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'screens/home_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -18,6 +17,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool isLoading = false;
   bool obscure = true;
 
+  // ✅ SIGNUP FUNCTION (NO NAVIGATION HERE)
   Future<void> signup() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -29,26 +29,34 @@ class _SignupScreenState extends State<SignupScreen> {
         password: passwordController.text.trim(),
       );
 
-      if (!mounted) return;
+      // ✅ DO NOTHING HERE
+      // AuthWrapper will handle navigation automatically
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
     } on FirebaseAuthException catch (e) {
       String message = "Signup failed";
 
       if (e.code == 'email-already-in-use') {
-        message = "Email already in use";
+        message = "Email already exists";
       } else if (e.code == 'weak-password') {
-        message = "Password is too weak";
+        message = "Password too weak (min 6 characters)";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email format";
       }
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,35 +68,49 @@ class _SignupScreenState extends State<SignupScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Card(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 5,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
 
                     const Text(
                       "Create Account 🚀",
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
 
                     const SizedBox(height: 20),
 
+                    // 📧 EMAIL
                     TextFormField(
                       controller: emailController,
                       decoration: const InputDecoration(
                         labelText: "Email",
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) =>
-                          value!.isEmpty ? "Enter email" : null,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return "Enter email";
+                        }
+                        if (!value.contains('@')) {
+                          return "Enter valid email";
+                        }
+                        return null;
+                      },
                     ),
 
                     const SizedBox(height: 15),
 
+                    // 🔒 PASSWORD
                     TextFormField(
                       controller: passwordController,
                       obscureText: obscure,
@@ -96,20 +118,27 @@ class _SignupScreenState extends State<SignupScreen> {
                         labelText: "Password",
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
-                          icon: Icon(obscure
-                              ? Icons.visibility
-                              : Icons.visibility_off),
+                          icon: Icon(
+                            obscure
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
                           onPressed: () {
                             setState(() => obscure = !obscure);
                           },
                         ),
                       ),
-                      validator: (value) =>
-                          value!.length < 6 ? "Min 6 characters" : null,
+                      validator: (value) {
+                        if (value == null || value.length < 6) {
+                          return "Min 6 characters";
+                        }
+                        return null;
+                      },
                     ),
 
                     const SizedBox(height: 20),
 
+                    // 🚀 SIGNUP BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -123,6 +152,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                 color: Colors.white)
                             : const Text("Sign Up"),
                       ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // 🔁 BACK TO LOGIN
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Already have an account? Login"),
                     ),
                   ],
                 ),

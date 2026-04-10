@@ -1,127 +1,246 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart';
+
+import '../widgets/app_drawer.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
 
   @override
-  WeatherScreenState createState() => WeatherScreenState();
+  State<WeatherScreen> createState() => _WeatherScreenState();
 }
 
-class WeatherScreenState extends State<WeatherScreen> {
-  final TextEditingController _locationController = TextEditingController();
-  String? _weatherDescription;
-  double? _temperature;
-  String? _advice;
-  bool _loading = false;
+class _WeatherScreenState extends State<WeatherScreen> {
+  final String apiKey = "dd211ba3e0176d8198fce34c96413e3c";
 
-  // Replace with your OpenWeatherMap API key
-  final String apiKey = 'YOUR_OPENWEATHERMAP_API_KEY';
+  String city = "";
+  double temp = 0;
+  String condition = "";
+  String icon = "";
 
-  Future<void> fetchWeather(String city) async {
-    setState(() {
-      _loading = true;
-    });
+  List hourlyTemps = [];
+  List dailyTemps = [];
 
-    final url = Uri.parse(
-        'https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey&units=metric');
+  bool isLoading = false;
+
+  // 🇨🇲 FULL CAMEROON LIST
+  final List<String> locations = [
+    // Regions capitals
+    "Douala",
+    "Yaounde",
+    "Bamenda",
+    "Buea",
+    "Garoua",
+    "Maroua",
+    "Ngaoundere",
+    "Ebolowa",
+    "Bertoua",
+    "Bafoussam",
+
+    // towns
+    "Limbe",
+    "Kribi",
+    "Kumba",
+    "Dschang",
+    "Foumban",
+    "Tiko",
+    "Sangmelima",
+    "Meiganga",
+    "Mokolo",
+  ];
+
+  String selectedCity = "Douala";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchWeather(selectedCity);
+  }
+
+  // 🌍 FETCH FULL DATA (current + forecast)
+  Future<void> fetchWeather(String location) async {
+    setState(() => isLoading = true);
 
     try {
-      final response = await http.get(url);
-      if (!mounted) return; // Prevent setState after dispose
-      final data = json.decode(response.body);
+      // CURRENT
+      final currentUrl =
+          "https://api.openweathermap.org/data/2.5/weather?q=$location,CM&appid=$apiKey&units=metric";
 
-      if (data['cod'] == 200) {
-        double temp = data['main']['temp'];
-        String desc = data['weather'][0]['description'];
+      final forecastUrl =
+          "https://api.openweathermap.org/data/2.5/forecast?q=$location,CM&appid=$apiKey&units=metric";
 
-        String advice;
-        if (temp < 18) {
-          advice = "It's cold. Stay warm and avoid getting chilled.";
-        } else if (temp > 28) {
-          advice = "It's hot. Stay hydrated and avoid heat stress.";
-        } else {
-          advice = "Weather is mild. Stay comfortable and hydrated.";
+      final currentRes = await http.get(Uri.parse(currentUrl));
+      final forecastRes = await http.get(Uri.parse(forecastUrl));
+
+      if (currentRes.statusCode == 200 &&
+          forecastRes.statusCode == 200) {
+        final current = jsonDecode(currentRes.body);
+        final forecast = jsonDecode(forecastRes.body);
+
+        // HOURLY (next 8 = ~24h)
+        List hourly = forecast['list'].take(8).toList();
+
+        // DAILY (every 8 = 24h)
+        List daily = [];
+        for (int i = 0; i < forecast['list'].length; i += 8) {
+          daily.add(forecast['list'][i]);
         }
 
         setState(() {
-          _temperature = temp;
-          _weatherDescription = desc;
-          _advice = advice;
-          _loading = false;
+          city = current['name'];
+          temp = (current['main']['temp'] as num).toDouble();
+          condition = current['weather'][0]['main'];
+          icon = current['weather'][0]['icon'];
+
+          hourlyTemps =
+              hourly.map((e) => (e['main']['temp'] as num).toDouble()).toList();
+
+          dailyTemps =
+              daily.map((e) => (e['main']['temp'] as num).toDouble()).toList();
         });
       } else {
-        setState(() {
-          _weatherDescription = "City not found";
-          _temperature = null;
-          _advice = null;
-          _loading = false;
-        });
+        showMessage("Error loading weather");
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _weatherDescription = "Error fetching weather";
-        _temperature = null;
-        _advice = null;
-        _loading = false;
-      });
+      showMessage("Network error");
     }
+
+    setState(() => isLoading = false);
   }
 
-  @override
-  void dispose() {
-    _locationController.dispose();
-    super.dispose();
+  void showMessage(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // 🎨 GRADIENT
+  LinearGradient gradient() {
+    if (condition.toLowerCase().contains("rain")) {
+      return const LinearGradient(
+          colors: [Colors.blueGrey, Colors.black]);
+    }
+    return const LinearGradient(
+        colors: [Colors.blue, Colors.deepPurple]);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Weather & Advice')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _locationController,
-              decoration: const InputDecoration(
-                labelText: 'Enter your city',
-                border: OutlineInputBorder(),
-              ),
+      drawer: const AppDrawer(),
+      body: Container(
+        decoration: BoxDecoration(gradient: gradient()),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: ListView(
+              children: [
+
+                // HEADER
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Weather",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold)),
+
+                    DropdownButton<String>(
+                      value: selectedCity,
+                      dropdownColor: Colors.black,
+                      style: const TextStyle(color: Colors.white),
+                      items: locations.map((loc) {
+                        return DropdownMenuItem(
+                          value: loc,
+                          child: Text(loc),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => selectedCity = value);
+                          fetchWeather(value);
+                        }
+                      },
+                    )
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                if (isLoading)
+                  const Center(child: CircularProgressIndicator()),
+
+                if (!isLoading && city.isNotEmpty) ...[
+
+                  // CURRENT
+                  Text(city,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 26)),
+
+                  Row(
+                    children: [
+                      Image.network(
+                          "https://openweathermap.org/img/wn/$icon@2x.png"),
+                      Text("${temp.toStringAsFixed(1)}°C",
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 40))
+                    ],
+                  ),
+
+                  Text(condition,
+                      style: const TextStyle(color: Colors.white70)),
+
+                  const SizedBox(height: 20),
+
+                  // 📊 HOURLY GRAPH
+                  const Text("Hourly",
+                      style:
+                          TextStyle(color: Colors.white, fontSize: 18)),
+
+                  SizedBox(
+                    height: 200,
+                    child: LineChart(
+                      LineChartData(
+                        borderData: FlBorderData(show: false),
+                        titlesData: FlTitlesData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: List.generate(
+                              hourlyTemps.length,
+                              (i) => FlSpot(i.toDouble(), hourlyTemps[i]),
+                            ),
+                            isCurved: true,
+                            dotData: FlDotData(show: true),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 📅 7 DAY FORECAST
+                  const Text("7-Day Forecast",
+                      style:
+                          TextStyle(color: Colors.white, fontSize: 18)),
+
+                  const SizedBox(height: 10),
+
+                  ...List.generate(dailyTemps.length, (i) {
+                    return Card(
+                      child: ListTile(
+                        title: Text("Day ${i + 1}"),
+                        trailing: Text(
+                            "${dailyTemps[i].toStringAsFixed(1)}°C"),
+                      ),
+                    );
+                  })
+                ]
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                final city = _locationController.text.trim();
-                if (city.isNotEmpty) {
-                  fetchWeather(city);
-                }
-              },
-              child: const Text('Check Weather'),
-            ),
-            const SizedBox(height: 24),
-            if (_loading) const CircularProgressIndicator(),
-            if (!_loading && _weatherDescription != null)
-              Column(
-                children: [
-                  Text(
-                    'Weather: $_weatherDescription',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  Text(
-                    'Temperature: ${_temperature?.toStringAsFixed(1)}°C',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Advice: $_advice',
-                    style: const TextStyle(fontSize: 16, color: Colors.blue),
-                  ),
-                ],
-              ),
-          ],
+          ),
         ),
       ),
     );
