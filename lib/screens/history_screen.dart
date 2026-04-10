@@ -81,7 +81,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       appBar: AppBar(
         title: const Text("Health Analytics"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
       ),
 
       body: logs.isEmpty

@@ -90,7 +90,7 @@ class _HydrationNutritionScreenState
 
       appBar: AppBar(
         title: const Text("Health Tracker"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
       ),
 
       body: Padding(

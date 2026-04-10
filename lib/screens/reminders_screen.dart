@@ -113,7 +113,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
       appBar: AppBar(
         title: const Text("Reminders"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
       ),
 
       body: ListView(

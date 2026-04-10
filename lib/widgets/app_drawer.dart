@@ -29,8 +29,8 @@ class AppDrawer extends StatelessWidget {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFF1565C0),
-                  Color(0xFF26A69A),
+                 Color(0xFF1565C0),
+                  Color.fromARGB(255, 51, 129, 230),
                 ],
               ),
             ),

@@ -137,7 +137,7 @@ class _SupportScreenState extends State<SupportScreen>
     });
   }
 
-  // 🤖 AI
+  //  AI
   String generateAIResponse(String input) {
     input = input.toLowerCase();
 
@@ -172,7 +172,7 @@ class _SupportScreenState extends State<SupportScreen>
 
       appBar: AppBar(
         title: const Text("Support Center"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

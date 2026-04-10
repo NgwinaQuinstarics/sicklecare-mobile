@@ -132,7 +132,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
       appBar: AppBar(
         title: const Text("Weather"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
         elevation: 0,
       ),
 

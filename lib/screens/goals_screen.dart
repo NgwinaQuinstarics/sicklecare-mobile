@@ -102,7 +102,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text("Goals & Progress"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
       ),
       body: RefreshIndicator(
         onRefresh: () async {

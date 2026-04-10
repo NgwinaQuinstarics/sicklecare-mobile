@@ -55,7 +55,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
     }
   }
 
-  // ✅ SAVE DATA
+  //SAVE DATA
   Future<void> saveData() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -79,7 +79,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Tracker saved successfully ✅")),
+      const SnackBar(content: Text("Tracker saved successfully ")),
     );
   }
 
@@ -102,7 +102,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
 
       appBar: AppBar(
         title: const Text("Daily Health Tracker"),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
       ),
 
       body: Padding(

@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await FirebaseAuth.instance.signOut();
   }
 
-  // ✅ SAVE PAIN LEVEL
+  //  SAVE PAIN LEVEL
   Future<void> savePainLevel(double value) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: const AppDrawer(),
 
       appBar: AppBar(
-        backgroundColor: Colors.redAccent,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
         title: const Text("SickleCare"),
         actions: [
           IconButton(
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 📊 STATS
+                    //  STATS
                     Row(
                       children: [
                         _card(
@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               min: 0,
                               max: 10,
                               divisions: 10,
-                              activeColor: Colors.redAccent,
+                              activeColor: const Color.fromARGB(255, 49, 127, 237),
                               label: painLevel.toInt().toString(),
                               onChanged: (value) {
                                 setState(() {
@@ -258,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ✅ NAVIGATION
+  // NAVIGATION
   void _navigate(Widget screen) {
     Navigator.push(
       context,
