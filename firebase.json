@@ -1,1 +1,42 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"sicklecare-15d7a","appId":"1:822337344078:android:8eafbde452f270a3fe291f","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"sicklecare-15d7a","configurations":{"android":"1:822337344078:android:8eafbde452f270a3fe291f","ios":"1:822337344078:ios:29225294f57ab1fffe291f","macos":"1:822337344078:ios:29225294f57ab1fffe291f","web":"1:822337344078:web:6b4f8c1b3800b797fe291f","windows":"1:822337344078:web:bf96d817e5f96e94fe291f"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "sicklecare-15d7a",
+          "appId": "1:822337344078:android:8eafbde452f270a3fe291f",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "sicklecare-15d7a",
+          "configurations": {
+            "android": "1:822337344078:android:8eafbde452f270a3fe291f",
+            "ios": "1:822337344078:ios:29225294f57ab1fffe291f",
+            "macos": "1:822337344078:ios:29225294f57ab1fffe291f",
+            "web": "1:822337344078:web:6b4f8c1b3800b797fe291f",
+            "windows": "1:822337344078:web:bf96d817e5f96e94fe291f"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}

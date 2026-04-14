@@ -45,6 +45,11 @@ ios/Runner/GoogleService-Info.plist
 # ------------------------------
 .env
 
+.agents/
+.claude/
+skills-lock.json
+
+.env.*
 # ------------------------------
 # flutter dependencies / secrets
 # ------------------------------
