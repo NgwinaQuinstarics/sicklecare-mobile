@@ -28,7 +28,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   bool isLoading = true;
 
-  // 🚨 SMART ALERTS
+  //  SMART ALERTS
   List<String> alerts = [];
 
   @override
@@ -37,7 +37,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     loadHistory();
   }
 
-  // 🔄 LOAD DATA
+  //  LOAD DATA
   Future<void> loadHistory() async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -66,12 +66,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       final adherence = medication ? 10.0 : 0.0;
 
-      // 📊 charts
+      //  charts
       painSpots.add(FlSpot(index.toDouble(), pain));
       hydrationSpots.add(FlSpot(index.toDouble(), hydration));
       adherenceSpots.add(FlSpot(index.toDouble(), adherence));
 
-      // 📋 logs
+      //  logs
       logs.add({
         'id': doc.id,
         'pain': pain,
@@ -79,7 +79,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         'adherence': adherence,
       });
 
-      // 🚨 SMART ANALYSIS
+      //  SMART ANALYSIS
       if (pain >= 7) {
         alerts.add("⚠️ High pain detected on ${doc.id}. Consider medical attention.");
       }
@@ -115,7 +115,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     loadHistory();
   }
 
-  // 📄 CSV EXPORT
+  //  CSV EXPORT
   Future<void> exportCSV() async {
     if (logs.isEmpty) return;
 
@@ -134,7 +134,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await Share.shareXFiles([XFile(file.path)], text: "Health Report");
   }
 
-  // 📄 PDF EXPORT
+  //  PDF EXPORT
   Future<void> exportPDF() async {
     final pdf = pw.Document();
 
@@ -184,7 +184,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
       appBar: AppBar(
         title: const Text("Health Analytics"),
-        backgroundColor: Colors.blueGrey,
+        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
         actions: [
           IconButton(
             icon: const Icon(Icons.table_chart),
