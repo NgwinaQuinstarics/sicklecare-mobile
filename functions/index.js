@@ -1,57 +1,54 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const fetch = require("node-fetch");
 
 admin.initializeApp();
 
-exports.onHealthUpdate = functions.firestore
-  .document("users/{userId}/daily/{docId}")
-  .onWrite(async (change, context) => {
-    const data = change.after.exists ? change.after.data() : null;
+exports.autoReply = functions.firestore
+  .document("support_chats/{userId}/messages/{messageId}")
+  .onCreate(async (snap, context) => {
+    const data = snap.data();
 
-    if (!data) return null;
-
-    const {
-      painLevel,
-      hydrationLevel,
-      fever,
-      fatigue,
-      headache,
-      dizziness,
-      nausea,
-    } = data;
+    if (data.sender !== "user") return;
 
     const userId = context.params.userId;
+    const message = data.text;
 
-    // 🚨 1. DANGER DETECTION
-    let alerts = [];
+    const apiKey = functions.config().openai.key;
 
-    if (painLevel >= 8) {
-      alerts.push("Severe pain detected");
-    }
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a helpful health assistant." },
+          { role: "user", content: message }
+        ],
+      }),
+    });
 
-    if (hydrationLevel <= 2) {
-      alerts.push("Very low hydration");
-    }
+    const result = await response.json();
 
-    if (fever === true) {
-      alerts.push("Fever detected");
-    }
+    const reply =
+      result.choices?.[0]?.message?.content ||
+      "Sorry, I couldn't respond.";
 
-    if (fatigue && dizziness) {
-      alerts.push("Possible crisis warning");
-    }
+    const chatRef = admin.firestore()
+      .collection("support_chats")
+      .doc(userId);
 
-    // 🚨 2. SAVE ALERTS
-    if (alerts.length > 0) {
-      await admin.firestore()
-        .collection("users")
-        .doc(userId)
-        .collection("alerts")
-        .add({
-          alerts: alerts,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-    }
+    await chatRef.collection("messages").add({
+      text: reply,
+      sender: "ai",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-    return null;
+    await chatRef.update({
+      lastMessage: reply,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   });
