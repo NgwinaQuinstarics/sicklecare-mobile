@@ -3,11 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/app_drawer.dart';
-
 import 'hydration_nutrition_screen.dart';
 import 'tracker_screen.dart';
 import 'reminders_screen.dart';
-import 'goals_screen.dart';
 import 'support_screen.dart';
 import 'history_screen.dart';
 
@@ -18,20 +16,39 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
+
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+
+  double painLevel = 0;
 
   String get today {
     final now = DateTime.now();
     return "${now.year}-${now.month}-${now.day}";
   }
 
-  Future<void> logout() async {
-    await FirebaseAuth.instance.signOut();
+  @override
+  void initState() {
+    super.initState();
+
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+
+    _controller.forward();
   }
 
-  //  SAVE PAIN LEVEL
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> savePainLevel(double value) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -47,19 +64,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }, SetOptions(merge: true));
   }
 
+  Future<void> logout() async {
+    await FirebaseAuth.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = user?.uid;
 
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
+    const brandBlue = Color(0xFF1A56BE);
+    const softBg = Color(0xFFF4F7FA);
+    const textMain = Color(0xFF1E293B);
+    const accentBrown = Color(0xFF5D4037);
+    const criticalRed = Color(0xFFB91C1C);
 
-      // ✅ GLOBAL DRAWER (CLEAN)
+    return Scaffold(
+      backgroundColor: softBg,
       drawer: const AppDrawer(),
 
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
-        title: const Text("SickleCare"),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: brandBlue),
+        title: const Text(
+          "SickleCare",
+          style: TextStyle(
+            color: textMain,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -69,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       body: uid == null
-          ? const Center(child: Text("User not logged in"))
+          ? const Center(child: Text("Authentication Required"))
           : StreamBuilder<DocumentSnapshot>(
               stream: firestore
                   .collection('users')
@@ -79,237 +112,184 @@ class _HomeScreenState extends State<HomeScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 double hydration = 0;
-                double painLevel = 0;
                 int mealsCount = 0;
 
                 if (snapshot.hasData && snapshot.data!.exists) {
-                  final data =
-                      snapshot.data!.data() as Map<String, dynamic>;
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
 
                   hydration = (data['hydration'] ?? 0).toDouble();
                   painLevel = (data['painLevel'] ?? 0).toDouble();
-                  mealsCount =
-                      (data['meals'] as List?)?.length ?? 0;
+                  mealsCount = (data['meals'] as List?)?.length ?? 0;
                 }
 
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
+                return FadeTransition(
+                  opacity: _fadeAnim,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
 
-                    // 👋 Welcome
-                    const Text(
-                      "Welcome back, Warrior 💪",
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold),
-                    ),
+                      const SizedBox(height: 10),
 
-                    const SizedBox(height: 5),
+                      /// HEADER
+                      const Text(
+                        "Today’s Health Snapshot",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
 
-                    Text(
-                      user?.email ?? "",
-                      style: TextStyle(color: Colors.grey[700]),
-                    ),
+                      const SizedBox(height: 20),
 
-                    const SizedBox(height: 20),
+                      /// METRICS
+                      Row(
+                        children: [
+                          _metric("Hydration",
+                              "${hydration.toStringAsFixed(1)}L",
+                              Icons.water_drop, brandBlue),
+                          const SizedBox(width: 10),
+                          _metric("Meals", "$mealsCount",
+                              Icons.restaurant, accentBrown),
+                        ],
+                      ),
 
-                    //  STATS
-                    Row(
-                      children: [
-                        _card(
-                          "Hydration",
-                          "${hydration.toStringAsFixed(1)} L",
-                          Icons.water_drop,
+                      const SizedBox(height: 25),
+
+                      /// PAIN TRACKER
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                        const SizedBox(width: 10),
-                        _card(
-                          "Meals",
-                          "$mealsCount meals",
-                          Icons.restaurant,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Row(
-                      children: [
-                        _card(
-                          "Pain",
-                          painLevel.toInt().toString(),
-                          Icons.monitor_heart,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // ❤️ PAIN TRACKER
-                    const Text(
-                      "How are you feeling today?",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Card(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Pain Level: ${painLevel.toInt()}",
-                              style: const TextStyle(fontSize: 16),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text("Pain Level",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold)),
+                                Text(
+                                  "${painLevel.toInt()}/10",
+                                  style: TextStyle(
+                                    color: painLevel > 6
+                                        ? criticalRed
+                                        : brandBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                             Slider(
                               value: painLevel,
                               min: 0,
                               max: 10,
                               divisions: 10,
-                              activeColor: const Color.fromARGB(255, 49, 127, 237),
-                              label: painLevel.toInt().toString(),
-                              onChanged: (value) {
-                                setState(() {
-                                  painLevel = value;
-                                });
-                                savePainLevel(value);
+                              activeColor: brandBlue,
+                              onChanged: (v) {
+                                setState(() => painLevel = v);
+                                savePainLevel(v);
                               },
                             ),
                           ],
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 30),
 
-                    // ⚡ QUICK ACTIONS
-                    const Text(
-                      "Quick Actions",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600),
-                    ),
+                      /// MODULES
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        children: [
+                          _tile("Health", Icons.healing, brandBlue, () {
+                            _nav(const HydrationNutritionScreen());
+                          }),
+                          _tile("Tracker", Icons.assignment, criticalRed,
+                              () {
+                            _nav(const TrackerScreen());
+                          }),
+                          _tile("Reminders", Icons.alarm, Colors.orange,
+                              () {
+                            _nav(const RemindersScreen());
+                          }),
+                          _tile("Support", Icons.people, Colors.teal,
+                              () {
+                            _nav(const SupportScreen());
+                          }),
+                          _tile("History", Icons.bar_chart, accentBrown,
+                              () {
+                            _nav(const HistoryScreen());
+                          }),
+                        ],
+                      ),
 
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 40),
 
-                    GridView.count(
-                      shrinkWrap: true,
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      physics:
-                          const NeverScrollableScrollPhysics(),
-                      children: [
-
-                        _actionCard(
-                          "Health",
-                          Icons.favorite,
-                          Colors.blue,
-                          () => _navigate(
-                              const HydrationNutritionScreen()),
+                      const Center(
+                        child: Text(
+                          "Stay strong. Every drop of effort counts 💙",
+                          textAlign: TextAlign.center,
                         ),
-
-                        _actionCard(
-                          "Tracker",
-                          Icons.warning,
-                          Colors.red,
-                          () => _navigate(const TrackerScreen()),
-                        ),
-
-                        _actionCard(
-                          "Reminders",
-                          Icons.alarm,
-                          Colors.orange,
-                          () => _navigate(const RemindersScreen()),
-                        ),
-
-                        _actionCard(
-                          "Goals",
-                          Icons.flag,
-                          Colors.green,
-                          () => _navigate(const GoalsScreen()),
-                        ),
-
-                        _actionCard(
-                          "Support",
-                          Icons.people,
-                          Colors.teal,
-                          () => _navigate(const SupportScreen()),
-                        ),
-
-                        _actionCard(
-                          "Analytics",
-                          Icons.show_chart,
-                          Colors.purple,
-                          () => _navigate(const HistoryScreen()),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-                  ],
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
     );
   }
 
-  // NAVIGATION
-  void _navigate(Widget screen) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => screen),
-    );
-  }
-
-  // 📊 CARD
-  Widget _card(String title, String value, IconData icon) {
+  Widget _metric(String title, String value, IconData icon, Color color) {
     return Expanded(
-      child: Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(icon, size: 30, color: Colors.redAccent),
-              const SizedBox(height: 10),
-              Text(title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 5),
-              Text(value,
-                  style: const TextStyle(fontSize: 16)),
-            ],
-          ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 10),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(title, style: TextStyle(color: Colors.grey[600])),
+          ],
         ),
       ),
     );
   }
 
-  // ⚡ ACTION CARD
-  Widget _actionCard(
-      String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _tile(String label, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: color),
-              const SizedBox(height: 10),
-              Text(title, textAlign: TextAlign.center),
-            ],
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 6),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
         ),
       ),
     );
+  }
+
+  void _nav(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 }
