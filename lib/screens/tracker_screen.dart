@@ -28,7 +28,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     return "${now.year}-${now.month}-${now.day}";
   }
 
-  // ✅ LOAD EXISTING DATA
   Future<void> loadData() async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -55,7 +54,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     }
   }
 
-  //SAVE DATA
   Future<void> saveData() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -79,7 +77,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Tracker saved successfully ")),
+      const SnackBar(content: Text("Tracker saved successfully ✅")),
     );
   }
 
@@ -97,12 +95,21 @@ class _TrackerScreenState extends State<TrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const Color brandBlue = Color(0xFF1A56BE);
+    const Color softBg = Color(0xFFF4F7FA);
+
     return Scaffold(
+      backgroundColor: softBg,
       drawer: const AppDrawer(),
 
       appBar: AppBar(
-        title: const Text("Daily Health Tracker"),
-        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
+        title: const Text(
+          "Daily Health Tracker",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: brandBlue),
+        elevation: 0,
       ),
 
       body: Padding(
@@ -112,116 +119,145 @@ class _TrackerScreenState extends State<TrackerScreen> {
           child: ListView(
             children: [
 
-              // ❤️ PAIN LEVEL
+              // HEADER
               const Text(
-                "Pain Level",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-
-              Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        "$painLevel / 10",
-                        style: const TextStyle(fontSize: 20),
-                      ),
-                      Slider(
-                        value: painLevel.toDouble(),
-                        min: 0,
-                        max: 10,
-                        divisions: 10,
-                        activeColor: const Color.fromARGB(255, 11, 68, 182),
-                        onChanged: (value) {
-                          setState(() {
-                            painLevel = value.toInt();
-                          });
-                        },
-                      ),
-                    ],
-                  ),
+                "Track your daily health",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 20),
 
-              // ⚠️ SYMPTOMS
-              const Text(
-                "Symptoms",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-
-              Card(
+              // PAIN LEVEL CARD
+              _card(
+                title: "Pain Level",
                 child: Column(
                   children: [
-                    CheckboxListTile(
-                      title: const Text("Fatigue"),
-                      value: fatigue,
-                      onChanged: (val) {
-                        setState(() => fatigue = val!);
-                      },
+                    Text(
+                      "$painLevel / 10",
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    CheckboxListTile(
-                      title: const Text("Fever"),
-                      value: fever,
-                      onChanged: (val) {
-                        setState(() => fever = val!);
-                      },
-                    ),
-                    CheckboxListTile(
-                      title: const Text("Headache"),
-                      value: headache,
-                      onChanged: (val) {
-                        setState(() => headache = val!);
+                    Slider(
+                      value: painLevel.toDouble(),
+                      min: 0,
+                      max: 10,
+                      divisions: 10,
+                      activeColor: brandBlue,
+                      onChanged: (value) {
+                        setState(() => painLevel = value.toInt());
                       },
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // 📝 NOTES
-              const Text(
-                "Additional Notes",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 10),
-
-              TextFormField(
-                controller: notesController,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: "Describe how you feel...",
-                  border: OutlineInputBorder(),
+              // SYMPTOMS CARD
+              _card(
+                title: "Symptoms",
+                child: Column(
+                  children: [
+                    _checkTile("Fatigue", fatigue, (v) {
+                      setState(() => fatigue = v!);
+                    }),
+                    _checkTile("Fever", fever, (v) {
+                      setState(() => fever = v!);
+                    }),
+                    _checkTile("Headache", headache, (v) {
+                      setState(() => headache = v!);
+                    }),
+                  ],
                 ),
-                validator: (value) {
-                  if (value != null && value.length > 200) {
-                    return "Keep notes under 200 characters";
-                  }
-                  return null;
-                },
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // 💾 SAVE BUTTON
+              // NOTES CARD
+              _card(
+                title: "Additional Notes",
+                child: TextFormField(
+                  controller: notesController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: "Describe how you feel today...",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value != null && value.length > 200) {
+                      return "Keep notes under 200 characters";
+                    }
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // SAVE BUTTON
               ElevatedButton(
                 onPressed: saveData,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
+                  backgroundColor: brandBlue,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text("Save Tracker"),
+                child: const Text(
+                  "Save Tracker",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // CARD UI
+  Widget _card({required String title, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              )),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+
+  // CHECKBOX TILE
+  Widget _checkTile(String title, bool value, Function(bool?) onChanged) {
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title),
+      value: value,
+      activeColor: Colors.redAccent,
+      onChanged: onChanged,
     );
   }
 }

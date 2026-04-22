@@ -64,41 +64,28 @@ class _HomeScreenState extends State<HomeScreen>
     }, SetOptions(merge: true));
   }
 
-  Future<void> logout() async {
-    await FirebaseAuth.instance.signOut();
-  }
-
   @override
   Widget build(BuildContext context) {
     final uid = user?.uid;
 
-    const brandBlue = Color(0xFF1A56BE);
-    const softBg = Color(0xFFF4F7FA);
-    const textMain = Color(0xFF1E293B);
-    const accentBrown = Color(0xFF5D4037);
-    const criticalRed = Color(0xFFB91C1C);
+    const Color brandBlue = Color(0xFF1A56BE);
+    const Color softBg = Color(0xFFF4F7FA);
+    const Color textMain = Color(0xFF1E293B);
+    const Color accentBrown = Color(0xFF5D4037);
+    const Color criticalRed = Color(0xFFB91C1C);
 
     return Scaffold(
       backgroundColor: softBg,
       drawer: const AppDrawer(),
 
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
+        backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: brandBlue),
         title: const Text(
           "SickleCare",
-          style: TextStyle(
-            color: textMain,
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: textMain, fontWeight: FontWeight.w800),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: logout,
-          )
-        ],
       ),
 
       body: uid == null
@@ -124,119 +111,139 @@ class _HomeScreenState extends State<HomeScreen>
 
                 return FadeTransition(
                   opacity: _fadeAnim,
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
 
-                      const SizedBox(height: 10),
-
-                      /// HEADER
-                      const Text(
-                        "Today’s Health Snapshot",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// METRICS
-                      Row(
-                        children: [
-                          _metric("Hydration",
-                              "${hydration.toStringAsFixed(1)}L",
-                              Icons.water_drop, brandBlue),
-                          const SizedBox(width: 10),
-                          _metric("Meals", "$mealsCount",
-                              Icons.restaurant, accentBrown),
-                        ],
-                      ),
-
-                      const SizedBox(height: 25),
-
-                      /// PAIN TRACKER
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        /// HEADER
+                        Row(
                           children: [
-                            Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text("Pain Level",
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold)),
-                                Text(
-                                  "${painLevel.toInt()}/10",
-                                  style: TextStyle(
-                                    color: painLevel > 6
-                                        ? criticalRed
-                                        : brandBlue,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: brandBlue.withValues(alpha: 0.1),
+                              child: const Icon(Icons.person_outline,
+                                  color: brandBlue),
                             ),
-                            Slider(
-                              value: painLevel,
-                              min: 0,
-                              max: 10,
-                              divisions: 10,
-                              activeColor: brandBlue,
-                              onChanged: (v) {
-                                setState(() => painLevel = v);
-                                savePainLevel(v);
-                              },
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Welcome back,",
+                                    style: TextStyle(color: Colors.grey[600])),
+                                const Text("Warrior",
+                                    style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold)),
+                              ],
                             ),
                           ],
                         ),
-                      ),
 
-                      const SizedBox(height: 30),
+                        const SizedBox(height: 30),
 
-                      /// MODULES
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        children: [
-                          _tile("Health", Icons.healing, brandBlue, () {
-                            _nav(const HydrationNutritionScreen());
-                          }),
-                          _tile("Tracker", Icons.assignment, criticalRed,
-                              () {
-                            _nav(const TrackerScreen());
-                          }),
-                          _tile("Reminders", Icons.alarm, Colors.orange,
-                              () {
-                            _nav(const RemindersScreen());
-                          }),
-                          _tile("Support", Icons.people, Colors.teal,
-                              () {
-                            _nav(const SupportScreen());
-                          }),
-                          _tile("History", Icons.bar_chart, accentBrown,
-                              () {
-                            _nav(const HistoryScreen());
-                          }),
-                        ],
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      const Center(
-                        child: Text(
-                          "Stay strong. Every drop of effort counts 💙",
-                          textAlign: TextAlign.center,
+                        /// METRICS
+                        Row(
+                          children: [
+                            _metric("Hydration",
+                                "${hydration.toStringAsFixed(1)}L",
+                                Icons.water_drop_outlined,
+                                brandBlue),
+                            const SizedBox(width: 12),
+                            _metric("Meals", "$mealsCount",
+                                Icons.restaurant_rounded,
+                                accentBrown),
+                          ],
                         ),
-                      ),
-                    ],
+
+                        const SizedBox(height: 25),
+
+                        /// PAIN CARD
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text("Pain Level",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  Text(
+                                    "${painLevel.toInt()}/10",
+                                    style: TextStyle(
+                                      color: painLevel > 6
+                                          ? criticalRed
+                                          : brandBlue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Slider(
+                                value: painLevel,
+                                min: 0,
+                                max: 10,
+                                divisions: 10,
+                                onChanged: (value) {
+                                  setState(() => painLevel = value);
+                                  savePainLevel(value);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        /// ACTION GRID (GOALS REMOVED)
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          children: [
+                            _tile("Health", Icons.healing_outlined,
+                                brandBlue, () {
+                              _nav(const HydrationNutritionScreen());
+                            }),
+                            _tile("Tracker", Icons.assignment, criticalRed,
+                                () {
+                              _nav(const TrackerScreen());
+                            }),
+                            _tile("Reminders", Icons.alarm, Colors.orange,
+                                () {
+                              _nav(const RemindersScreen());
+                            }),
+                            _tile("Support", Icons.people, Colors.teal, () {
+                              _nav(const SupportScreen());
+                            }),
+                            _tile("History", Icons.bar_chart,
+                                accentBrown, () {
+                              _nav(const HistoryScreen());
+                            }),
+                          ],
+                        ),
+
+                        const SizedBox(height: 40),
+
+                        const Center(
+                          child: Text(
+                            "Stay strong today. Small steps save lives 💙",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Colors.black54),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -279,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(label,
                 style: const TextStyle(
                     fontSize: 12, fontWeight: FontWeight.bold)),

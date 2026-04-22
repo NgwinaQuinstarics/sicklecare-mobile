@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -14,7 +13,7 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  final String apiKey = "dd211ba3e0176d8198fce34c96413e3c"; 
+  final String apiKey = "dd211ba3e0176d8198fce34c96413e3c";
 
   String city = "";
   double temp = 0;
@@ -69,8 +68,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
       final currentRes = await http.get(Uri.parse(currentUrl));
       final forecastRes = await http.get(Uri.parse(forecastUrl));
 
-      if (currentRes.statusCode == 200 &&
-          forecastRes.statusCode == 200) {
+      if (currentRes.statusCode == 200 && forecastRes.statusCode == 200) {
         final current = jsonDecode(currentRes.body);
         final forecast = jsonDecode(forecastRes.body);
 
@@ -87,11 +85,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
           condition = current['weather'][0]['main'];
           icon = current['weather'][0]['icon'];
 
-          hourlyTemps =
-              hourly.map((e) => (e['main']['temp'] as num).toDouble()).toList();
+          hourlyTemps = hourly
+              .map((e) => (e['main']['temp'] as num).toDouble())
+              .toList();
 
-          dailyTemps =
-              daily.map((e) => (e['main']['temp'] as num).toDouble()).toList();
+          dailyTemps = daily
+              .map((e) => (e['main']['temp'] as num).toDouble())
+              .toList();
         });
       } else {
         showMessage("Failed to load weather");
@@ -108,7 +108,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // 🎨 APP THEME GRADIENT
   LinearGradient gradient() {
     if (condition.toLowerCase().contains("rain")) {
       return const LinearGradient(
@@ -119,7 +118,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
 
     return const LinearGradient(
-      colors: [Color.fromARGB(255, 89, 74, 74), Color.fromARGB(255, 100, 136, 244)],
+      colors: [Color(0xFFF4F7FA), Color(0xFFE2E8F0)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -128,12 +127,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FA),
       drawer: const AppDrawer(),
 
       appBar: AppBar(
         title: const Text("Weather"),
-        backgroundColor: const Color.fromARGB(255, 49, 127, 237),
+        backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF1E40AF)),
       ),
 
       body: Container(
@@ -143,20 +144,20 @@ class _WeatherScreenState extends State<WeatherScreen> {
             padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-
                 // LOCATION SELECTOR
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      "Current Location",
+                      "Location",
                       style: TextStyle(
-                          color: Colors.white70, fontSize: 16),
+                        color: Color(0xFF0F172A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     DropdownButton<String>(
                       value: selectedCity,
-                      dropdownColor: Colors.black,
-                      style: const TextStyle(color: Colors.white),
                       underline: Container(),
                       items: locations.map((loc) {
                         return DropdownMenuItem(
@@ -180,46 +181,63 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   const Center(child: CircularProgressIndicator()),
 
                 if (!isLoading && city.isNotEmpty) ...[
-
-                  // MAIN WEATHER CARD
+                  // WEATHER CARD
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
                     ),
                     child: Column(
                       children: [
-                        Text(city,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold)),
-
+                        Text(
+                          city,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
                         const SizedBox(height: 10),
 
                         Image.network(
-                            "https://openweathermap.org/img/wn/$icon@2x.png"),
+                          "https://openweathermap.org/img/wn/$icon@2x.png",
+                        ),
 
-                        Text("${temp.toStringAsFixed(1)}°C",
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 42,
-                                fontWeight: FontWeight.bold)),
+                        Text(
+                          "${temp.toStringAsFixed(1)}°C",
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E40AF),
+                          ),
+                        ),
 
-                        Text(condition,
-                            style: const TextStyle(
-                                color: Colors.white70)),
+                        Text(
+                          condition,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 30),
 
-                  // HOURLY GRAPH
-                  const Text("24h Temperature",
-                      style:
-                          TextStyle(color: Colors.white, fontSize: 18)),
+                  const Text(
+                    "24h Temperature",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
 
                   const SizedBox(height: 10),
 
@@ -234,11 +252,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           LineChartBarData(
                             spots: List.generate(
                               hourlyTemps.length,
-                              (i) => FlSpot(i.toDouble(), hourlyTemps[i]),
+                              (i) => FlSpot(
+                                  i.toDouble(), hourlyTemps[i]),
                             ),
                             isCurved: true,
                             barWidth: 3,
-                            color: Colors.white,
+                            color: const Color(0xFF1E40AF),
                             dotData: FlDotData(show: false),
                           )
                         ],
@@ -248,18 +267,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
                   const SizedBox(height: 30),
 
-                  // DAILY FORECAST
-                  const Text("7-Day Forecast",
-                      style:
-                          TextStyle(color: Colors.white, fontSize: 18)),
+                  const Text(
+                    "7-Day Forecast",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
 
                   const SizedBox(height: 10),
 
                   ...List.generate(dailyTemps.length, (i) {
                     return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: ListTile(
                         leading: const Icon(Icons.calendar_today),
                         title: Text("Day ${i + 1}"),
@@ -270,7 +290,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         ),
                       ),
                     );
-                  })
+                  }),
                 ]
               ],
             ),
