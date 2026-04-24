@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,16 +17,19 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
-  double water = 0;
+  double localWater = 0;
   List<String> meals = [];
   final mealController = TextEditingController();
 
   bool saving = false;
-  bool isSliding = false; // 🔥 IMPORTANT FIX
+  bool isSliding = false;
 
+  Timer? debounce;
+
+  // ✅ FIXED DATE FORMAT (CRITICAL)
   String get today {
     final now = DateTime.now();
-    return "${now.year}-${now.month}-${now.day}";
+    return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
   }
 
   DocumentReference<Map<String, dynamic>> get docRef {
@@ -39,28 +43,34 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
   Stream<DocumentSnapshot<Map<String, dynamic>>> get stream =>
       docRef.snapshots();
 
+  // ================= SAVE =================
   Future<void> saveData() async {
     if (user == null) return;
 
-    setState(() => saving = true);
-
     try {
       await docRef.set({
-        'hydration': water,
+        'hydration': localWater,
         'meals': meals,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Saved successfully")),
-      );
     } catch (e) {
       debugPrint("SAVE ERROR: $e");
-    } finally {
-      if (mounted) setState(() => saving = false);
     }
+  }
+
+  // ================= AUTO SAVE =================
+  void autoSave() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 700), () {
+      saveData();
+    });
+  }
+
+  @override
+  void dispose() {
+    debounce?.cancel();
+    mealController.dispose();
+    super.dispose();
   }
 
   @override
@@ -84,12 +94,14 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
           if (snapshot.hasData && snapshot.data!.exists) {
             final data = snapshot.data!.data()!;
 
-            final firebaseWater = (data['hydration'] ?? 0).toDouble();
+            final firebaseWater =
+                (data['hydration'] ?? 0).toDouble();
+
             meals = List<String>.from(data['meals'] ?? []);
 
-            // 🔥 ONLY UPDATE UI IF NOT SLIDING
+            // only sync when user is NOT sliding
             if (!isSliding) {
-              water = firebaseWater.clamp(0, 5);
+              localWater = firebaseWater.clamp(0, 5);
             }
           }
 
@@ -102,14 +114,12 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                 const Text(
                   "Daily Health Tracking",
                   style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      fontSize: 22, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 25),
 
-                /// 💧 HYDRATION CARD
+                // ================= HYDRATION =================
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -123,13 +133,14 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                       const Text(
                         "Hydration 💧",
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
                       ),
 
                       const SizedBox(height: 10),
 
                       Text(
-                        "${water.toStringAsFixed(1)} L",
+                        "${localWater.toStringAsFixed(1)} L",
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -137,7 +148,7 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                       ),
 
                       Slider(
-                        value: water.clamp(0, 5), // 🔥 SAFETY CLAMP
+                        value: localWater.clamp(0, 5),
                         min: 0,
                         max: 5,
                         divisions: 10,
@@ -148,12 +159,13 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                         },
 
                         onChanged: (value) {
-                          setState(() => water = value);
+                          setState(() => localWater = value);
+                          autoSave();
                         },
 
                         onChangeEnd: (_) {
                           setState(() => isSliding = false);
-                          saveData(); // 🔥 AUTO SAVE ON RELEASE
+                          saveData();
                         },
                       ),
                     ],
@@ -162,10 +174,11 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
 
                 const SizedBox(height: 25),
 
-                /// 🍽 MEALS
+                // ================= MEALS =================
                 const Text(
                   "Meals",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 10),
@@ -197,6 +210,8 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                           meals.add(mealController.text.trim());
                           mealController.clear();
                         });
+
+                        saveData();
                       },
                       child: const Icon(Icons.add),
                     ),
@@ -212,6 +227,7 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                       label: Text(meal),
                       onDeleted: () {
                         setState(() => meals.remove(meal));
+                        saveData();
                       },
                     );
                   }).toList(),
@@ -222,10 +238,8 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: saving ? null : saveData,
-                    child: saving
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("Save Data"),
+                    onPressed: saveData,
+                    child: const Text("Save Data"),
                   ),
                 ),
               ],

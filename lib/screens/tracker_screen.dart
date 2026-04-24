@@ -17,35 +17,38 @@ class _TrackerScreenState extends State<TrackerScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
-  int painLevel = 0;
+  double painLevel = 0; // FIX: use double for consistency
   bool fatigue = false;
   bool fever = false;
   bool headache = false;
+
   final notesController = TextEditingController();
 
+  // ================= FIXED DATE FORMAT =================
   String get today {
     final now = DateTime.now();
-    return "${now.year}-${now.month}-${now.day}";
+    return "${now.year}-"
+        "${now.month.toString().padLeft(2, '0')}-"
+        "${now.day.toString().padLeft(2, '0')}";
   }
 
-  Future<void> loadData() async {
-    final uid = user?.uid;
-    if (uid == null) return;
+  DocumentReference get docRef => firestore
+      .collection('users')
+      .doc(user!.uid)
+      .collection('daily')
+      .doc(today);
 
-    final doc = await firestore
-        .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .doc(today)
-        .get();
+  // ================= LOAD =================
+  Future<void> loadData() async {
+    final doc = await docRef.get();
 
     if (!mounted) return;
 
     if (doc.exists) {
-      final data = doc.data()!;
+      final data = doc.data() as Map<String, dynamic>;
 
       setState(() {
-        painLevel = (data['painLevel'] ?? 0).toInt();
+        painLevel = (data['painLevel'] ?? 0).toDouble();
         fatigue = data['fatigue'] ?? false;
         fever = data['fever'] ?? false;
         headache = data['headache'] ?? false;
@@ -54,18 +57,14 @@ class _TrackerScreenState extends State<TrackerScreen> {
     }
   }
 
+  // ================= SAVE (FIXED) =================
   Future<void> saveData() async {
     if (!_formKey.currentState!.validate()) return;
 
     final uid = user?.uid;
     if (uid == null) return;
 
-    await firestore
-        .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .doc(today)
-        .set({
+    await docRef.set({
       'painLevel': painLevel,
       'fatigue': fatigue,
       'fever': fever,
@@ -119,36 +118,33 @@ class _TrackerScreenState extends State<TrackerScreen> {
           child: ListView(
             children: [
 
-              // HEADER
               const Text(
                 "Track your daily health",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 20),
 
-              // PAIN LEVEL CARD
+              // PAIN
               _card(
                 title: "Pain Level",
                 child: Column(
                   children: [
                     Text(
-                      "$painLevel / 10",
+                      "${painLevel.toInt()} / 10",
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Slider(
-                      value: painLevel.toDouble(),
+                      value: painLevel,
                       min: 0,
                       max: 10,
                       divisions: 10,
                       activeColor: brandBlue,
                       onChanged: (value) {
-                        setState(() => painLevel = value.toInt());
+                        setState(() => painLevel = value);
                       },
                     ),
                   ],
@@ -157,7 +153,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
 
               const SizedBox(height: 16),
 
-              // SYMPTOMS CARD
+              // SYMPTOMS
               _card(
                 title: "Symptoms",
                 child: Column(
@@ -177,41 +173,24 @@ class _TrackerScreenState extends State<TrackerScreen> {
 
               const SizedBox(height: 16),
 
-              // NOTES CARD
+              // NOTES
               _card(
-                title: "Additional Notes",
+                title: "Notes",
                 child: TextFormField(
                   controller: notesController,
                   maxLines: 4,
                   decoration: const InputDecoration(
-                    hintText: "Describe how you feel today...",
+                    hintText: "How do you feel today?",
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) {
-                    if (value != null && value.length > 200) {
-                      return "Keep notes under 200 characters";
-                    }
-                    return null;
-                  },
                 ),
               ),
 
               const SizedBox(height: 25),
 
-              // SAVE BUTTON
               ElevatedButton(
                 onPressed: saveData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: brandBlue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  "Save Tracker",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                child: const Text("Save Tracker"),
               ),
             ],
           ),
@@ -220,29 +199,18 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // CARD UI
   Widget _card({required String title, required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 10,
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, 5),
-          )
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              )),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           child,
         ],
@@ -250,13 +218,11 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // CHECKBOX TILE
   Widget _checkTile(String title, bool value, Function(bool?) onChanged) {
     return CheckboxListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(title),
       value: value,
-      activeColor: Colors.redAccent,
       onChanged: onChanged,
     );
   }

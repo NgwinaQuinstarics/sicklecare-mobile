@@ -9,6 +9,7 @@ import 'reminders_screen.dart';
 import 'support_screen.dart';
 import 'history_screen.dart';
 import 'weather_screen.dart';
+import '../utils/date_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,17 +31,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   double painLevel = 0;
 
-  String get today {
-    final now = DateTime.now();
-    return "${now.year}-${now.month}-${now.day}";
-  }
-
   @override
   void initState() {
     super.initState();
 
     _fadeController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+
     _scaleController =
         AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
 
@@ -58,7 +55,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  /// ✅ SAFE SAVE (NO OVERWRITE)
   Future<void> savePainLevel(double value) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -67,37 +63,34 @@ class _HomeScreenState extends State<HomeScreen>
         .collection('users')
         .doc(uid)
         .collection('daily')
-        .doc(today)
+        .doc(DateHelper.today())
         .set({
       'painLevel': value,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true)); // 🔥 VERY IMPORTANT
+    }, SetOptions(merge: true));
   }
 
   @override
   Widget build(BuildContext context) {
     final uid = user?.uid;
 
-    const Color brandBlue = Color(0xFF1E40AF);
-    const Color softBg = Color(0xFFF8FAFC);
-    const Color textMain = Color(0xFF0F172A);
-    const Color accentBrown = Color(0xFF5D4037);
-    const Color criticalRed = Color(0xFFB91C1C);
+    const brandBlue = Color(0xFF1E40AF);
+    const softBg = Color(0xFFF8FAFC);
+    const textMain = Color(0xFF0F172A);
+    const accentBrown = Color(0xFF5D4037);
+    const criticalRed = Color(0xFFB91C1C);
 
     return Scaffold(
       backgroundColor: softBg,
-      drawer: const AppDrawer(currentRoute: "home"),
+      drawer: const AppDrawer(),
 
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
+        elevation: 0,
         iconTheme: const IconThemeData(color: brandBlue),
         title: const Text(
           "SickleCare",
-          style: TextStyle(
-            color: textMain,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: textMain, fontWeight: FontWeight.bold),
         ),
       ),
 
@@ -108,23 +101,25 @@ class _HomeScreenState extends State<HomeScreen>
                   .collection('users')
                   .doc(uid)
                   .collection('daily')
-                  .doc(today)
+                  .doc(DateHelper.today())
                   .snapshots(),
 
               builder: (context, snapshot) {
                 double hydration = 0;
                 int mealsCount = 0;
 
-                /// ✅ SAFE DATA PARSING
                 if (snapshot.hasData && snapshot.data!.exists) {
                   final data = snapshot.data!.data() as Map<String, dynamic>;
 
                   hydration = (data['hydration'] ?? 0).toDouble();
-                  painLevel = (data['painLevel'] ?? 0).toDouble();
+                  mealsCount = (data['meals'] ?? []).length;
 
-                  mealsCount = data['meals'] != null
-                      ? List.from(data['meals']).length
-                      : 0;
+                  final rawPain = data['painLevel'];
+                  painLevel = rawPain == null
+                      ? 0
+                      : (rawPain is int)
+                          ? rawPain.toDouble()
+                          : rawPain.toDouble();
                 }
 
                 return FadeTransition(
@@ -137,20 +132,18 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 20),
 
-                        /// 👋 HEADER
+                        // HEADER
                         Row(
-                          children: [
+                          children: const [
                             CircleAvatar(
                               radius: 26,
-                              backgroundColor:
-                                  brandBlue.withValues(alpha: 0.1),
-                              child:
-                                  const Icon(Icons.person, color: brandBlue),
+                              backgroundColor: Colors.white,
+                              child: Icon(Icons.person, color: Colors.blue),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text("Welcome back",
                                     style: TextStyle(color: Colors.grey)),
                                 Text("Warrior",
@@ -164,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 25),
 
-                        /// 📊 METRICS
+                        // METRICS
                         Row(
                           children: [
                             _metric("Hydration",
@@ -178,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 25),
 
-                        /// ❤️ PAIN LEVEL
+                        // PAIN
                         ScaleTransition(
                           scale: _scale,
                           child: Container(
@@ -186,13 +179,6 @@ class _HomeScreenState extends State<HomeScreen>
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(10),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
                             ),
                             child: Column(
                               children: [
@@ -201,17 +187,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text("Pain Level",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                    Text(
-                                      "${painLevel.toInt()}/10",
-                                      style: TextStyle(
-                                        color: painLevel > 6
-                                            ? criticalRed
-                                            : brandBlue,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                        style: TextStyle(fontWeight: FontWeight.bold)),
+                                    Text("${painLevel.toInt()}/10"),
                                   ],
                                 ),
                                 Slider(
@@ -230,18 +207,9 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 25),
 
-                        /// ⚡ QUICK ACTIONS
-                        const Text(
-                          "Quick Actions",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
-                        ),
-
-                        const SizedBox(height: 15),
-
+                        // QUICK ACTIONS
                         GridView.count(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -266,11 +234,11 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 40),
 
-                        /// ❤️ FOOTER
+                        // FOOTER
                         const Center(
                           child: Column(
                             children: [
-                              Icon(Icons.favorite, color: criticalRed),
+                              Icon(Icons.favorite, color: Colors.red),
                               SizedBox(height: 10),
                               Text(
                                 "Your strength is in consistency.",
@@ -280,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                               SizedBox(height: 5),
                               Text(
-                                "Every small action you take today builds a healthier tomorrow.",
+                                "Every small action builds a healthier tomorrow.",
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.grey),
                               ),
@@ -312,9 +280,8 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color),
             const SizedBox(height: 10),
             Text(value,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(title, style: TextStyle(color: Colors.grey[600])),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(title),
           ],
         ),
       ),
@@ -328,22 +295,13 @@ class _HomeScreenState extends State<HomeScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color),
             const SizedBox(height: 8),
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(label),
           ],
         ),
       ),

@@ -27,7 +27,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<Map<String, dynamic>> logs = [];
   List<Map<String, dynamic>> alerts = [];
 
-  bool isLoading = true;
+  bool loading = true;
 
   @override
   void initState() {
@@ -35,10 +35,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     loadHistory();
   }
 
-  // ---------------- LOAD DATA ----------------
   Future<void> loadHistory() async {
     final uid = user?.uid;
     if (uid == null) return;
+
+    setState(() => loading = true);
 
     painSpots.clear();
     hydrationSpots.clear();
@@ -46,73 +47,67 @@ class _HistoryScreenState extends State<HistoryScreen> {
     logs.clear();
     alerts.clear();
 
-    final snapshot = await firestore
-        .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .orderBy('updatedAt')
-        .get();
+    try {
+      final snapshot = await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('daily')
+          .get();
 
-    int index = 0;
+      int index = 0;
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
 
-      final pain = (data['painLevel'] ?? 0).toDouble();
-      final hydration = (data['hydration'] ?? 0).toDouble();
-      final medication = data['medicationTaken'] ?? false;
+        final pain = (data['painLevel'] ?? 0).toDouble();
+        final hydration = (data['hydration'] ?? 0).toDouble();
+        final medication = data['medicationTaken'] ?? false;
 
-      final adherence = medication ? 10.0 : 0.0;
+        final adherence = medication ? 10.0 : 0.0;
 
-      painSpots.add(FlSpot(index.toDouble(), pain));
-      hydrationSpots.add(FlSpot(index.toDouble(), hydration));
-      adherenceSpots.add(FlSpot(index.toDouble(), adherence));
+        painSpots.add(FlSpot(index.toDouble(), pain));
+        hydrationSpots.add(FlSpot(index.toDouble(), hydration));
+        adherenceSpots.add(FlSpot(index.toDouble(), adherence));
 
-      logs.add({
-        'id': doc.id,
-        'pain': pain,
-        'hydration': hydration,
-        'adherence': adherence,
-      });
-
-      // ---------------- ALERTS ----------------
-      if (pain >= 7) {
-        alerts.add({
-          'id': "${doc.id}_pain",
-          'message': "⚠️ High pain detected on ${doc.id}"
+        logs.add({
+          'id': doc.id,
+          'pain': pain,
+          'hydration': hydration,
+          'adherence': adherence,
         });
-      }
 
-      if (hydration < 2) {
-        alerts.add({
-          'id': "${doc.id}_hydration",
-          'message': "💧 Low hydration on ${doc.id}"
-        });
-      }
+        if (pain >= 7) {
+          alerts.add({
+            'id': "${doc.id}_pain",
+            'message': "⚠️ High pain on ${doc.id}"
+          });
+        }
 
-      if (!medication) {
-        alerts.add({
-          'id': "${doc.id}_medication",
-          'message': "💊 Medication missed on ${doc.id}"
-        });
-      }
+        if (hydration < 2) {
+          alerts.add({
+            'id': "${doc.id}_hydration",
+            'message': "💧 Low hydration on ${doc.id}"
+          });
+        }
 
-      index++;
+        if (!medication) {
+          alerts.add({
+            'id': "${doc.id}_med",
+            'message': "💊 Medication missed on ${doc.id}"
+          });
+        }
+
+        index++;
+      }
+    } catch (e) {
+      debugPrint("History error: $e");
     }
 
     if (mounted) {
-      setState(() => isLoading = false);
+      setState(() => loading = false);
     }
   }
 
-  // ---------------- DELETE ALERT ----------------
-  void deleteAlert(String id) {
-    setState(() {
-      alerts.removeWhere((a) => a['id'] == id);
-    });
-  }
-
-  // ---------------- DELETE RECORD ----------------
   Future<void> deleteRecord(String id) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -127,7 +122,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     loadHistory();
   }
 
-  // ---------------- EXPORT CSV ----------------
   Future<void> exportCSV() async {
     String csv = "Date,Pain,Hydration,Adherence\n";
 
@@ -143,7 +137,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await Share.shareXFiles([XFile(file.path)]);
   }
 
-  // ---------------- EXPORT PDF ----------------
   Future<void> exportPDF() async {
     final pdf = pw.Document();
 
@@ -153,7 +146,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text("SickleCare Report"),
-            pw.SizedBox(height: 20),
+            pw.SizedBox(height: 10),
             pw.Text("Total Records: ${logs.length}"),
           ],
         ),
@@ -168,11 +161,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await Share.shareXFiles([XFile(file.path)]);
   }
 
-  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF1A56BE);
     const bg = Color(0xFFF4F7FA);
+    const primaryBlue = Color(0xFF1A56BE);
 
     return Scaffold(
       backgroundColor: bg,
@@ -183,100 +175,97 @@ class _HistoryScreenState extends State<HistoryScreen> {
         elevation: 0,
         title: const Text(
           "Health History",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        iconTheme: const IconThemeData(color: primary),
+        iconTheme: const IconThemeData(color: primaryBlue),
         actions: [
-          IconButton(onPressed: exportCSV, icon: const Icon(Icons.table_chart)),
-          IconButton(onPressed: exportPDF, icon: const Icon(Icons.picture_as_pdf)),
+          IconButton(
+            onPressed: exportCSV,
+            icon: const Icon(Icons.table_chart),
+          ),
+          IconButton(
+            onPressed: exportPDF,
+            icon: const Icon(Icons.picture_as_pdf),
+          ),
         ],
       ),
 
-      body: isLoading
+      body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-
-                // ---------------- ALERTS ----------------
                 if (alerts.isNotEmpty) ...[
                   const Text(
                     "Health Alerts",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-
-                  ...alerts.map(
-                    (alert) => Card(
-                      color: Colors.red.withValues(alpha: 0.8),
-                      child: ListTile(
-                        leading: const Icon(Icons.warning, color: Colors.red),
-                        title: Text(alert['message']),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => deleteAlert(alert['id']),
+                  ...alerts.map((alert) => Card(
+                        color: Colors.red.shade100,
+                        child: ListTile(
+                          leading: const Icon(Icons.warning),
+                          title: Text(alert['message']),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              setState(() {
+                                alerts.removeWhere(
+                                    (a) => a['id'] == alert['id']);
+                              });
+                            },
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-
+                      )),
                   const SizedBox(height: 20),
                 ],
 
-                _buildChart("Pain Trend", painSpots),
+                _chart("Pain Trend", painSpots),
                 const SizedBox(height: 20),
-
-                _buildChart("Hydration Trend", hydrationSpots),
+                _chart("Hydration Trend", hydrationSpots),
                 const SizedBox(height: 20),
+                _chart("Medication Adherence", adherenceSpots),
 
-                _buildChart("Medication Adherence", adherenceSpots),
                 const SizedBox(height: 20),
 
                 const Text(
-                  "History",
+                  "History Records",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 10),
 
-                ...logs.map(
-                  (log) => Card(
-                    child: ListTile(
-                      title: Text(log['id']),
-                      subtitle: Text(
-                        "Pain: ${log['pain']} | Water: ${log['hydration']} | Adherence: ${log['adherence']}/10",
+                ...logs.map((log) => Card(
+                      child: ListTile(
+                        title: Text(log['id']),
+                        subtitle: Text(
+                          "Pain: ${log['pain']} | Water: ${log['hydration']} | Adherence: ${log['adherence']}/10",
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => deleteRecord(log['id']),
+                        ),
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => deleteRecord(log['id']),
-                      ),
-                    ),
-                  ),
-                ),
+                    )),
               ],
             ),
     );
   }
 
-  // ---------------- CHART ----------------
-  Widget _buildChart(String title, List<FlSpot> spots) {
+  Widget _chart(String title, List<FlSpot> spots) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 10,
-          )
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
           SizedBox(
             height: 200,
