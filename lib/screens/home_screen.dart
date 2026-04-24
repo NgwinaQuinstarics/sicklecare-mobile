@@ -8,6 +8,7 @@ import 'tracker_screen.dart';
 import 'reminders_screen.dart';
 import 'support_screen.dart';
 import 'history_screen.dart';
+import 'weather_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,12 +18,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
-  late AnimationController _controller;
-  late Animation<double> _fadeAnim;
+  late AnimationController _fadeController;
+  late Animation<double> _fade;
+
+  late AnimationController _scaleController;
+  late Animation<double> _scale;
 
   double painLevel = 0;
 
@@ -35,20 +39,26 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
 
-    _controller =
+    _fadeController =
         AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _scaleController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
 
-    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _fade = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+    _scale = CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack);
 
-    _controller.forward();
+    _fadeController.forward();
+    _scaleController.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _fadeController.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
 
+  /// ✅ SAFE SAVE (NO OVERWRITE)
   Future<void> savePainLevel(double value) async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -61,22 +71,22 @@ class _HomeScreenState extends State<HomeScreen>
         .set({
       'painLevel': value,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)); // 🔥 VERY IMPORTANT
   }
 
   @override
   Widget build(BuildContext context) {
     final uid = user?.uid;
 
-    const Color brandBlue = Color(0xFF1A56BE);
-    const Color softBg = Color(0xFFF4F7FA);
-    const Color textMain = Color(0xFF1E293B);
+    const Color brandBlue = Color(0xFF1E40AF);
+    const Color softBg = Color(0xFFF8FAFC);
+    const Color textMain = Color(0xFF0F172A);
     const Color accentBrown = Color(0xFF5D4037);
     const Color criticalRed = Color(0xFFB91C1C);
 
     return Scaffold(
       backgroundColor: softBg,
-      drawer: const AppDrawer(),
+      drawer: const AppDrawer(currentRoute: "home"),
 
       appBar: AppBar(
         elevation: 0,
@@ -84,7 +94,10 @@ class _HomeScreenState extends State<HomeScreen>
         iconTheme: const IconThemeData(color: brandBlue),
         title: const Text(
           "SickleCare",
-          style: TextStyle(color: textMain, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: textMain,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
 
@@ -97,43 +110,50 @@ class _HomeScreenState extends State<HomeScreen>
                   .collection('daily')
                   .doc(today)
                   .snapshots(),
+
               builder: (context, snapshot) {
                 double hydration = 0;
                 int mealsCount = 0;
 
+                /// ✅ SAFE DATA PARSING
                 if (snapshot.hasData && snapshot.data!.exists) {
                   final data = snapshot.data!.data() as Map<String, dynamic>;
 
                   hydration = (data['hydration'] ?? 0).toDouble();
                   painLevel = (data['painLevel'] ?? 0).toDouble();
-                  mealsCount = (data['meals'] as List?)?.length ?? 0;
+
+                  mealsCount = data['meals'] != null
+                      ? List.from(data['meals']).length
+                      : 0;
                 }
 
                 return FadeTransition(
-                  opacity: _fadeAnim,
+                  opacity: _fade,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+
                         const SizedBox(height: 20),
 
-                        /// HEADER
+                        /// 👋 HEADER
                         Row(
                           children: [
                             CircleAvatar(
-                              radius: 24,
-                              backgroundColor: brandBlue.withValues(alpha: 0.1),
-                              child: const Icon(Icons.person_outline,
-                                  color: brandBlue),
+                              radius: 26,
+                              backgroundColor:
+                                  brandBlue.withValues(alpha: 0.1),
+                              child:
+                                  const Icon(Icons.person, color: brandBlue),
                             ),
                             const SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("Welcome back,",
-                                    style: TextStyle(color: Colors.grey[600])),
-                                const Text("Warrior",
+                              children: const [
+                                Text("Welcome back",
+                                    style: TextStyle(color: Colors.grey)),
+                                Text("Warrior",
                                     style: TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold)),
@@ -142,68 +162,86 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
 
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 25),
 
-                        /// METRICS
+                        /// 📊 METRICS
                         Row(
                           children: [
                             _metric("Hydration",
                                 "${hydration.toStringAsFixed(1)}L",
-                                Icons.water_drop_outlined,
-                                brandBlue),
+                                Icons.water_drop, brandBlue),
                             const SizedBox(width: 12),
                             _metric("Meals", "$mealsCount",
-                                Icons.restaurant_rounded,
-                                accentBrown),
+                                Icons.restaurant, accentBrown),
                           ],
                         ),
 
                         const SizedBox(height: 25),
 
-                        /// PAIN CARD
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text("Pain Level",
+                        /// ❤️ PAIN LEVEL
+                        ScaleTransition(
+                          scale: _scale,
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(10),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("Pain Level",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    Text(
+                                      "${painLevel.toInt()}/10",
                                       style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  Text(
-                                    "${painLevel.toInt()}/10",
-                                    style: TextStyle(
-                                      color: painLevel > 6
-                                          ? criticalRed
-                                          : brandBlue,
-                                      fontWeight: FontWeight.bold,
+                                        color: painLevel > 6
+                                            ? criticalRed
+                                            : brandBlue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              Slider(
-                                value: painLevel,
-                                min: 0,
-                                max: 10,
-                                divisions: 10,
-                                onChanged: (value) {
-                                  setState(() => painLevel = value);
-                                  savePainLevel(value);
-                                },
-                              ),
-                            ],
+                                  ],
+                                ),
+                                Slider(
+                                  value: painLevel,
+                                  min: 0,
+                                  max: 10,
+                                  divisions: 10,
+                                  activeColor: brandBlue,
+                                  onChanged: (value) {
+                                    setState(() => painLevel = value);
+                                    savePainLevel(value);
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                         ),
 
                         const SizedBox(height: 30),
 
-                        /// ACTION GRID (GOALS REMOVED)
+                        /// ⚡ QUICK ACTIONS
+                        const Text(
+                          "Quick Actions",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16),
+                        ),
+
+                        const SizedBox(height: 15),
+
                         GridView.count(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -211,37 +249,46 @@ class _HomeScreenState extends State<HomeScreen>
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                           children: [
-                            _tile("Health", Icons.healing_outlined,
-                                brandBlue, () {
-                              _nav(const HydrationNutritionScreen());
-                            }),
+                            _tile("Health", Icons.favorite, brandBlue,
+                                () => _nav(const HydrationNutritionScreen())),
                             _tile("Tracker", Icons.assignment, criticalRed,
-                                () {
-                              _nav(const TrackerScreen());
-                            }),
+                                () => _nav(const TrackerScreen())),
                             _tile("Reminders", Icons.alarm, Colors.orange,
-                                () {
-                              _nav(const RemindersScreen());
-                            }),
-                            _tile("Support", Icons.people, Colors.teal, () {
-                              _nav(const SupportScreen());
-                            }),
-                            _tile("History", Icons.bar_chart,
-                                accentBrown, () {
-                              _nav(const HistoryScreen());
-                            }),
+                                () => _nav(const RemindersScreen())),
+                            _tile("Support", Icons.support_agent, Colors.teal,
+                                () => _nav(const SupportScreen())),
+                            _tile("History", Icons.bar_chart, accentBrown,
+                                () => _nav(const HistoryScreen())),
+                            _tile("Weather", Icons.cloud, Colors.blueGrey,
+                                () => _nav(const WeatherScreen())),
                           ],
                         ),
 
                         const SizedBox(height: 40),
 
+                        /// ❤️ FOOTER
                         const Center(
-                          child: Text(
-                            "Stay strong today. Small steps save lives 💙",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, color: Colors.black54),
+                          child: Column(
+                            children: [
+                              Icon(Icons.favorite, color: criticalRed),
+                              SizedBox(height: 10),
+                              Text(
+                                "Your strength is in consistency.",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16),
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                "Every small action you take today builds a healthier tomorrow.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
                           ),
                         ),
+
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -265,8 +312,8 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color),
             const SizedBox(height: 10),
             Text(value,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             Text(title, style: TextStyle(color: Colors.grey[600])),
           ],
         ),
@@ -280,7 +327,14 @@ class _HomeScreenState extends State<HomeScreen>
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -288,8 +342,8 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color),
             const SizedBox(height: 8),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
       ),

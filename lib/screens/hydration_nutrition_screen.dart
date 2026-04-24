@@ -21,47 +21,30 @@ class _HydrationNutritionScreenState
   final mealController = TextEditingController();
   List<String> meals = [];
 
-  bool loading = true;
+  bool saving = false;
 
   String get today {
     final now = DateTime.now();
     return "${now.year}-${now.month}-${now.day}";
   }
 
-  @override
-  void initState() {
-    super.initState();
-    loadData();
-  }
-
-  // ================= LOAD =================
-  Future<void> loadData() async {
+  // ================= REAL-TIME STREAM =================
+  Stream<DocumentSnapshot> getDailyStream() {
     final uid = user?.uid;
-    if (uid == null) return;
-
-    final doc = await firestore
+    return firestore
         .collection('users')
         .doc(uid)
         .collection('daily')
         .doc(today)
-        .get();
-
-    if (!mounted) return;
-
-    if (doc.exists) {
-      setState(() {
-        water = (doc.data()?['hydration'] ?? 0).toDouble();
-        meals = List<String>.from(doc.data()?['meals'] ?? []);
-      });
-    }
-
-    setState(() => loading = false);
+        .snapshots();
   }
 
   // ================= SAVE =================
   Future<void> saveData() async {
     final uid = user?.uid;
     if (uid == null) return;
+
+    setState(() => saving = true);
 
     await firestore
         .collection('users')
@@ -74,10 +57,12 @@ class _HydrationNutritionScreenState
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
+    setState(() => saving = false);
+
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Health data saved successfully")),
+      const SnackBar(content: Text("Saved successfully")),
     );
   }
 
@@ -89,9 +74,10 @@ class _HydrationNutritionScreenState
 
   @override
   Widget build(BuildContext context) {
-    const Color brandBlue = Color(0xFF1A56BE);
-    const Color softBg = Color(0xFFF4F7FA);
-    const Color accentRed = Color(0xFFB91C1C);
+    const Color brandBlue = Color(0xFF1E40AF);
+    const Color softBg = Color(0xFFF8FAFC);
+    const Color textMain = Color(0xFF0F172A);
+    const Color danger = Color(0xFFB91C1C);
 
     return Scaffold(
       backgroundColor: softBg,
@@ -104,207 +90,188 @@ class _HydrationNutritionScreenState
         title: const Text(
           "Health Tracker",
           style: TextStyle(
-              color: Colors.black, fontWeight: FontWeight.w700),
+              color: textMain, fontWeight: FontWeight.w700),
         ),
       ),
 
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: getDailyStream(),
+        builder: (context, snapshot) {
 
-                  // HEADER
-                  const Text(
-                    "Daily Health Tracking",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+
+            water = (data['hydration'] ?? 0).toDouble();
+            meals = List<String>.from(data['meals'] ?? []);
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                // HEADER
+                const Text(
+                  "Daily Health Tracking",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    "Monitor hydration and nutrition to stay stable.",
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
+                ),
 
-                  const SizedBox(height: 25),
+                const SizedBox(height: 5),
 
-                  // ================= HYDRATION CARD =================
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        )
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                Text(
+                  "Stay consistent. Your body depends on it.",
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
 
-                        const Text(
-                          "Hydration 💧",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold),
-                        ),
+                const SizedBox(height: 25),
 
-                        const SizedBox(height: 10),
-
-                        Text(
-                          "${water.toStringAsFixed(1)} Litres",
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            activeTrackColor: brandBlue,
-                            inactiveTrackColor: Colors.grey[200],
-                            thumbColor: Colors.white,
-                            overlayColor: brandBlue.withValues(alpha: 0.2),
-                            trackHeight: 6,
-                          ),
-                          child: Slider(
-                            value: water,
-                            min: 0,
-                            max: 5,
-                            divisions: 10,
-                            onChanged: (value) {
-                              setState(() => water = value);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // ================= NUTRITION =================
-                  const Text(
-                    "Nutrition 🍽",
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Row(
-                    children: [
-
-                      Expanded(
-                        child: TextField(
-                          controller: mealController,
-                          decoration: InputDecoration(
-                            hintText: "Add meal (e.g Rice, Fish)",
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      Container(
-                        decoration: BoxDecoration(
-                          color: brandBlue,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.add, color: Colors.white),
-                          onPressed: () {
-                            if (mealController.text.isNotEmpty) {
-                              setState(() {
-                                meals.add(mealController.text.trim());
-                                mealController.clear();
-                              });
-                            }
-                          },
-                        ),
+                // ================= HYDRATION =================
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(10),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       )
                     ],
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
 
-                  const SizedBox(height: 15),
+                      const Text(
+                        "Hydration 💧",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
 
-                  // MEALS LIST
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: meals.map((meal) {
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(meal),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  meals.remove(meal);
-                                });
-                              },
-                              child: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: accentRed,
-                              ),
-                            )
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                      const SizedBox(height: 10),
 
-                  const SizedBox(height: 30),
-
-                  // SAVE BUTTON
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: saveData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandBlue,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      Text(
+                        "${water.toStringAsFixed(1)} L",
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      child: const Text(
-                        "Save Health Data",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+
+                      Slider(
+                        value: water,
+                        min: 0,
+                        max: 5,
+                        divisions: 10,
+                        activeColor: brandBlue,
+                        onChanged: (value) {
+                          setState(() => water = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                // ================= NUTRITION =================
+                const Text(
+                  "Meals 🍽",
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: mealController,
+                        decoration: InputDecoration(
+                          hintText: "e.g Rice, Beans",
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                     ),
+
+                    const SizedBox(width: 10),
+
+                    ElevatedButton(
+                      onPressed: () {
+                        if (mealController.text.isNotEmpty) {
+                          setState(() {
+                            meals.add(mealController.text.trim());
+                            mealController.clear();
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brandBlue,
+                      ),
+                      child: const Icon(Icons.add),
+                    )
+                  ],
+                ),
+
+                const SizedBox(height: 15),
+
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: meals.map((meal) {
+                    return Chip(
+                      label: Text(meal),
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      onDeleted: () {
+                        setState(() => meals.remove(meal));
+                      },
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 30),
+
+                // SAVE BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: saving ? null : saveData,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: brandBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: saving
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Save",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          );
+        },
+      ),
     );
   }
 }

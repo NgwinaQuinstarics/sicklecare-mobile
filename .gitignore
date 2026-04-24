@@ -25,6 +25,7 @@
 .pub-cache/
 build/
 coverage/
+firestore_service/
 
 # ------------------------------
 # Android / iOS build files
