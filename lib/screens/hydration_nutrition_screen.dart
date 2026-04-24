@@ -12,101 +12,85 @@ class HydrationNutritionScreen extends StatefulWidget {
       _HydrationNutritionScreenState();
 }
 
-class _HydrationNutritionScreenState
-    extends State<HydrationNutritionScreen> {
+class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
   double water = 0;
-  final mealController = TextEditingController();
   List<String> meals = [];
+  final mealController = TextEditingController();
 
   bool saving = false;
+  bool isSliding = false; // 🔥 IMPORTANT FIX
 
   String get today {
     final now = DateTime.now();
     return "${now.year}-${now.month}-${now.day}";
   }
 
-  // ================= REAL-TIME STREAM =================
-  Stream<DocumentSnapshot> getDailyStream() {
-    final uid = user?.uid;
+  DocumentReference<Map<String, dynamic>> get docRef {
     return firestore
         .collection('users')
-        .doc(uid)
+        .doc(user!.uid)
         .collection('daily')
-        .doc(today)
-        .snapshots();
+        .doc(today);
   }
 
-  // ================= SAVE =================
+  Stream<DocumentSnapshot<Map<String, dynamic>>> get stream =>
+      docRef.snapshots();
+
   Future<void> saveData() async {
-    final uid = user?.uid;
-    if (uid == null) return;
+    if (user == null) return;
 
     setState(() => saving = true);
 
-    await firestore
-        .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .doc(today)
-        .set({
-      'hydration': water,
-      'meals': meals,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      await docRef.set({
+        'hydration': water,
+        'meals': meals,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-    setState(() => saving = false);
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Saved successfully")),
-    );
-  }
-
-  @override
-  void dispose() {
-    mealController.dispose();
-    super.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Saved successfully")),
+      );
+    } catch (e) {
+      debugPrint("SAVE ERROR: $e");
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     const Color brandBlue = Color(0xFF1E40AF);
     const Color softBg = Color(0xFFF8FAFC);
-    const Color textMain = Color(0xFF0F172A);
-    const Color danger = Color(0xFFB91C1C);
 
     return Scaffold(
       backgroundColor: softBg,
       drawer: const AppDrawer(),
 
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: brandBlue),
-        title: const Text(
-          "Health Tracker",
-          style: TextStyle(
-              color: textMain, fontWeight: FontWeight.w700),
-        ),
+        title: const Text("Health Tracker"),
       ),
 
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: getDailyStream(),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: stream,
         builder: (context, snapshot) {
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
           if (snapshot.hasData && snapshot.data!.exists) {
-            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final data = snapshot.data!.data()!;
 
-            water = (data['hydration'] ?? 0).toDouble();
+            final firebaseWater = (data['hydration'] ?? 0).toDouble();
             meals = List<String>.from(data['meals'] ?? []);
+
+            // 🔥 ONLY UPDATE UI IF NOT SLIDING
+            if (!isSliding) {
+              water = firebaseWater.clamp(0, 5);
+            }
           }
 
           return SingleChildScrollView(
@@ -115,7 +99,6 @@ class _HydrationNutritionScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
 
-                // HEADER
                 const Text(
                   "Daily Health Tracking",
                   style: TextStyle(
@@ -124,28 +107,14 @@ class _HydrationNutritionScreenState
                   ),
                 ),
 
-                const SizedBox(height: 5),
-
-                Text(
-                  "Stay consistent. Your body depends on it.",
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-
                 const SizedBox(height: 25),
 
-                // ================= HYDRATION =================
+                /// 💧 HYDRATION CARD
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(10),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,8 +123,7 @@ class _HydrationNutritionScreenState
                       const Text(
                         "Hydration 💧",
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
 
                       const SizedBox(height: 10),
@@ -164,18 +132,28 @@ class _HydrationNutritionScreenState
                         "${water.toStringAsFixed(1)} L",
                         style: const TextStyle(
                           fontSize: 28,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
                       Slider(
-                        value: water,
+                        value: water.clamp(0, 5), // 🔥 SAFETY CLAMP
                         min: 0,
                         max: 5,
                         divisions: 10,
                         activeColor: brandBlue,
+
+                        onChangeStart: (_) {
+                          setState(() => isSliding = true);
+                        },
+
                         onChanged: (value) {
                           setState(() => water = value);
+                        },
+
+                        onChangeEnd: (_) {
+                          setState(() => isSliding = false);
+                          saveData(); // 🔥 AUTO SAVE ON RELEASE
                         },
                       ),
                     ],
@@ -184,11 +162,10 @@ class _HydrationNutritionScreenState
 
                 const SizedBox(height: 25),
 
-                // ================= NUTRITION =================
+                /// 🍽 MEALS
                 const Text(
-                  "Meals 🍽",
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                  "Meals",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 10),
@@ -199,7 +176,7 @@ class _HydrationNutritionScreenState
                       child: TextField(
                         controller: mealController,
                         decoration: InputDecoration(
-                          hintText: "e.g Rice, Beans",
+                          hintText: "Add meal",
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
@@ -214,18 +191,15 @@ class _HydrationNutritionScreenState
 
                     ElevatedButton(
                       onPressed: () {
-                        if (mealController.text.isNotEmpty) {
-                          setState(() {
-                            meals.add(mealController.text.trim());
-                            mealController.clear();
-                          });
-                        }
+                        if (mealController.text.trim().isEmpty) return;
+
+                        setState(() {
+                          meals.add(mealController.text.trim());
+                          mealController.clear();
+                        });
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandBlue,
-                      ),
                       child: const Icon(Icons.add),
-                    )
+                    ),
                   ],
                 ),
 
@@ -233,11 +207,9 @@ class _HydrationNutritionScreenState
 
                 Wrap(
                   spacing: 10,
-                  runSpacing: 10,
                   children: meals.map((meal) {
                     return Chip(
                       label: Text(meal),
-                      deleteIcon: const Icon(Icons.close, size: 18),
                       onDeleted: () {
                         setState(() => meals.remove(meal));
                       },
@@ -247,24 +219,13 @@ class _HydrationNutritionScreenState
 
                 const SizedBox(height: 30),
 
-                // SAVE BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: saving ? null : saveData,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: brandBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
                     child: saving
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            "Save",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                        : const Text("Save Data"),
                   ),
                 ),
               ],
