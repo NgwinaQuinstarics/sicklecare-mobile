@@ -10,6 +10,7 @@ import 'support_screen.dart';
 import 'history_screen.dart';
 import 'weather_screen.dart';
 import '../utils/date_helper.dart';
+import '../models/health_data.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,9 +27,6 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _fadeController;
   late Animation<double> _fade;
 
-  late AnimationController _scaleController;
-  late Animation<double> _scale;
-
   double painLevel = 0;
 
   @override
@@ -38,20 +36,17 @@ class _HomeScreenState extends State<HomeScreen>
     _fadeController =
         AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
 
-    _scaleController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-
-    _fade = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
-    _scale = CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack);
+    _fade = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    );
 
     _fadeController.forward();
-    _scaleController.forward();
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
-    _scaleController.dispose();
     super.dispose();
   }
 
@@ -83,10 +78,8 @@ class _HomeScreenState extends State<HomeScreen>
     return Scaffold(
       backgroundColor: softBg,
       drawer: const AppDrawer(),
-
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
         iconTheme: const IconThemeData(color: brandBlue),
         title: const Text(
           "SickleCare",
@@ -105,22 +98,10 @@ class _HomeScreenState extends State<HomeScreen>
                   .snapshots(),
 
               builder: (context, snapshot) {
-                double hydration = 0;
-                int mealsCount = 0;
+                final data = HealthData.fromMap(
+                    snapshot.data?.data() as Map<String, dynamic>?);
 
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-
-                  hydration = (data['hydration'] ?? 0).toDouble();
-                  mealsCount = (data['meals'] ?? []).length;
-
-                  final rawPain = data['painLevel'];
-                  painLevel = rawPain == null
-                      ? 0
-                      : (rawPain is int)
-                          ? rawPain.toDouble()
-                          : rawPain.toDouble();
-                }
+                painLevel = data.painLevel;
 
                 return FadeTransition(
                   opacity: _fade,
@@ -132,7 +113,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 20),
 
-                        // HEADER
                         Row(
                           children: const [
                             CircleAvatar(
@@ -157,59 +137,55 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 25),
 
-                        // METRICS
                         Row(
                           children: [
                             _metric("Hydration",
-                                "${hydration.toStringAsFixed(1)}L",
+                                "${data.hydration.toStringAsFixed(1)}L",
                                 Icons.water_drop, brandBlue),
                             const SizedBox(width: 12),
-                            _metric("Meals", "$mealsCount",
+                            _metric("Meals",
+                                "${data.meals.length}",
                                 Icons.restaurant, accentBrown),
                           ],
                         ),
 
                         const SizedBox(height: 25),
 
-                        // PAIN
-                        ScaleTransition(
-                          scale: _scale,
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text("Pain Level",
-                                        style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text("${painLevel.toInt()}/10"),
-                                  ],
-                                ),
-                                Slider(
-                                  value: painLevel,
-                                  min: 0,
-                                  max: 10,
-                                  divisions: 10,
-                                  activeColor: brandBlue,
-                                  onChanged: (value) {
-                                    setState(() => painLevel = value);
-                                    savePainLevel(value);
-                                  },
-                                ),
-                              ],
-                            ),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text("Pain Level",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  Text("${painLevel.toInt()}/10"),
+                                ],
+                              ),
+                              Slider(
+                                value: painLevel,
+                                min: 0,
+                                max: 10,
+                                divisions: 10,
+                                activeColor: brandBlue,
+                                onChanged: (value) {
+                                  setState(() => painLevel = value);
+                                  savePainLevel(value);
+                                },
+                              ),
+                            ],
                           ),
                         ),
 
                         const SizedBox(height: 25),
 
-                        // QUICK ACTIONS
                         GridView.count(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -234,7 +210,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                         const SizedBox(height: 40),
 
-                        // FOOTER
                         const Center(
                           child: Column(
                             children: [
@@ -280,7 +255,8 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color),
             const SizedBox(height: 10),
             Text(value,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                style: const TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold)),
             Text(title),
           ],
         ),
@@ -290,6 +266,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _tile(String label, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(

@@ -54,6 +54,7 @@ dependencies:
 
   #  Debugging
   logger: ^1.2.2
+  cloud_functions: ^4.7.6
 
 dev_dependencies:
   flutter_test:

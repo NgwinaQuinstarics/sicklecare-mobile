@@ -4,51 +4,70 @@ const fetch = require("node-fetch");
 
 admin.initializeApp();
 
-exports.autoReply = functions.firestore
-  .document("support_chats/{userId}/messages/{messageId}")
-  .onCreate(async (snap, context) => {
-    const data = snap.data();
+exports.sickleCareAI = functions.https.onCall(async (data, context) => {
+  try {
+    const uid = context.auth.uid;
+    if (!uid) {
+      throw new functions.https.HttpsError("unauthenticated");
+    }
 
-    if (data.sender !== "user") return;
+    const db = admin.firestore();
 
-    const userId = context.params.userId;
-    const message = data.text;
+    // 🔥 GET USER HEALTH DATA (REAL CONTEXT)
+    const today = new Date().toISOString().split("T")[0];
 
-    const apiKey = functions.config().openai.key;
+    const doc = await db
+      .collection("users")
+      .doc(uid)
+      .collection("daily")
+      .doc(today)
+      .get();
+
+    const health = doc.exists ? doc.data() : {};
+
+    const messages = data.messages || [];
+
+    // 🧠 BUILD SMART PROMPT
+    const systemPrompt = `
+You are a medical AI assistant specialized in Sickle Cell Disease.
+
+User Health Context:
+- Pain Level: ${health.painLevel || 0}/10
+- Hydration: ${health.hydration || 0}L
+- Meals: ${JSON.stringify(health.meals || [])}
+
+Rules:
+- Be calm, short, and supportive
+- Detect possible crisis risk
+- Always advise doctor for severe symptoms
+- Act like WhatsApp chat assistant
+`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "Authorization": `Bearer YOUR_OPENAI_API_KEY`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a helpful health assistant." },
-          { role: "user", content: message }
-        ],
-      }),
+          { role: "system", content: systemPrompt },
+          ...messages
+        ]
+      })
     });
 
-    const result = await response.json();
+    const dataRes = await response.json();
 
-    const reply =
-      result.choices?.[0]?.message?.content ||
-      "Sorry, I couldn't respond.";
+    const reply = dataRes.choices[0].message.content;
 
-    const chatRef = admin.firestore()
-      .collection("support_chats")
-      .doc(userId);
+    return { reply };
 
-    await chatRef.collection("messages").add({
-      text: reply,
-      sender: "ai",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await chatRef.update({
-      lastMessage: reply,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
+  } catch (error) {
+    console.error(error);
+    return {
+      reply: "I'm currently unable to respond. Please try again later."
+    };
+  }
+});

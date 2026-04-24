@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'auth_wrapper.dart';
@@ -9,11 +10,17 @@ Future<void> main() async {
 
   await Firebase.initializeApp();
 
-  // 🔥 SAFE dotenv loading (prevents crash)
+  // RENABLE OFFLINE PERSISTENCE
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
+  // dotenv safe load
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    debugPrint("⚠️ .env file not found, continuing without it");
+    debugPrint("⚠️ .env not found");
   }
 
   runApp(const MyApp());
