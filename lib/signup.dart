@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -11,39 +12,57 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final nameController = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
 
   bool isLoading = false;
   bool obscure = true;
 
-  // ✅ SIGNUP FUNCTION (NO NAVIGATION HERE)
   Future<void> signup() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => isLoading = true);
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // 1. Create Auth user
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      // ✅ DO NOTHING HERE
-      // AuthWrapper will handle navigation automatically
+      final uid = credential.user!.uid;
 
+      // 2. CREATE USER PROFILE IN FIRESTORE (IMPORTANT FIX)
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'uid': uid,
+        'name': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'age': 0,
+        'contact': '',
+        'genotype': 'SS',
+        'notifications': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Account created successfully")),
+      );
+
+      // ❗ DO NOT NAVIGATE — AuthWrapper handles it
     } on FirebaseAuthException catch (e) {
       String message = "Signup failed";
 
       if (e.code == 'email-already-in-use') {
-        message = "Email already exists";
+        message = "Email already in use";
       } else if (e.code == 'weak-password') {
-        message = "Password too weak (min 6 characters)";
+        message = "Weak password (min 6 chars)";
       } else if (e.code == 'invalid-email') {
-        message = "Invalid email format";
+        message = "Invalid email";
       }
-
-      if (!mounted) return;
 
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
@@ -53,119 +72,62 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 5,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
 
-                    const Text(
-                      "Create Account 🚀",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                const Text("Create Account",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
 
-                    const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-                    // 📧 EMAIL
-                    TextFormField(
-                      controller: emailController,
-                      decoration: const InputDecoration(
-                        labelText: "Email",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Enter email";
-                        }
-                        if (!value.contains('@')) {
-                          return "Enter valid email";
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    // 🔒 PASSWORD
-                    TextFormField(
-                      controller: passwordController,
-                      obscureText: obscure,
-                      decoration: InputDecoration(
-                        labelText: "Password",
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            obscure
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() => obscure = !obscure);
-                          },
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.length < 6) {
-                          return "Min 6 characters";
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 🚀 SIGNUP BUTTON
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : signup,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white)
-                            : const Text("Sign Up"),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // 🔁 BACK TO LOGIN
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text("Already have an account? Login"),
-                    ),
-                  ],
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "Full Name"),
+                  validator: (v) => v!.isEmpty ? "Enter name" : null,
                 ),
-              ),
+
+                const SizedBox(height: 10),
+
+                TextFormField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: "Email"),
+                  validator: (v) => v!.isEmpty ? "Enter email" : null,
+                ),
+
+                const SizedBox(height: 10),
+
+                TextFormField(
+                  controller: passwordController,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setState(() => obscure = !obscure),
+                    ),
+                  ),
+                  validator: (v) =>
+                      v!.length < 6 ? "Min 6 characters" : null,
+                ),
+
+                const SizedBox(height: 20),
+
+                ElevatedButton(
+                  onPressed: isLoading ? null : signup,
+                  child: isLoading
+                      ? const CircularProgressIndicator()
+                      : const Text("Sign Up"),
+                ),
+              ],
             ),
           ),
         ),

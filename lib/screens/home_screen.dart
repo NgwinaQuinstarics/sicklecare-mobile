@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/app_drawer.dart';
 import '../widgets/main_navigation.dart';
-
 import '../utils/date_helper.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -80,7 +79,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       backgroundColor: background,
-
       drawer: const AppDrawer(),
 
       appBar: AppBar(
@@ -91,16 +89,29 @@ class _HomeScreenState extends State<HomeScreen>
           color: primaryBlue,
         ),
 
-        title: const Text(
-          "SickleCare",
-          style: TextStyle(
-            color: textMain,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            Image.asset(
+              "assets/logo.png",
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+            ),
+
+            const SizedBox(width: 10),
+
+            const Text(
+              "SickleCare",
+              style: TextStyle(
+                color: textMain,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
 
-      // 🔥 BOTTOM NAVIGATION
+      // ================= BOTTOM NAVIGATION =================
       bottomNavigationBar: const MainNavigation(
         currentIndex: 0,
       ),
@@ -122,9 +133,7 @@ class _HomeScreenState extends State<HomeScreen>
             final data = snapshot.data!.data()!;
 
             hydration = (data['hydration'] ?? 0).toDouble();
-
             pain = (data['painLevel'] ?? 0).toDouble();
-
             meals = data['meals'] ?? [];
           }
 
@@ -158,24 +167,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                     child: Row(
                       children: [
-
-                        Container(
-                          padding: const EdgeInsets.all(14),
-
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-
-                          child: const Icon(
-                            Icons.favorite,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-
-                        const SizedBox(width: 18),
 
                         Expanded(
                           child: Column(

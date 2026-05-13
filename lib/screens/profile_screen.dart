@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/app_drawer.dart';
-import '../widgets/main_navigation.dart'; // ✅ ADD THIS
+import '../widgets/main_navigation.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,27 +35,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     loadProfile();
   }
 
-  Future<void> loadProfile() async {
-    final uid = user?.uid;
-    if (uid == null) return;
-
-    final doc = await firestore.collection('users').doc(uid).get();
-
-    if (doc.exists && mounted) {
-      final data = doc.data()!;
-      setState(() {
-        nameController.text = data['name'] ?? "";
-        ageController.text = (data['age'] ?? "").toString();
-        contactController.text = data['contact'] ?? "";
-        genotype = data['genotype'] ?? "SS";
-        notifications = data['notifications'] ?? true;
-        isLoading = false;
-      });
-    } else if (mounted) {
-      setState(() => isLoading = false);
-    }
+  @override
+  void dispose() {
+    nameController.dispose();
+    ageController.dispose();
+    contactController.dispose();
+    super.dispose();
   }
 
+  // ================= LOAD PROFILE =================
+  Future<void> loadProfile() async {
+    final uid = user?.uid;
+
+    if (uid == null) {
+      setState(() => isLoading = false);
+      return;
+    }
+
+    try {
+      final doc = await firestore.collection('users').doc(uid).get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        setState(() {
+          nameController.text = data['name'] ?? "";
+          ageController.text = (data['age'] ?? "").toString();
+          contactController.text = data['contact'] ?? "";
+          genotype = data['genotype'] ?? "SS";
+          notifications = data['notifications'] ?? true;
+        });
+      }
+    } catch (e) {
+      debugPrint("LOAD PROFILE ERROR: $e");
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  // ================= SAVE PROFILE =================
   Future<void> saveProfile() async {
     final uid = user?.uid;
     if (uid == null) return;
@@ -63,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) =>
+      builder: (_) =>
           const Center(child: CircularProgressIndicator(color: primaryBlue)),
     );
 
@@ -82,78 +100,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Profile securely synchronized"),
+          content: Text("Profile saved successfully"),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Sync failed: $e"), backgroundColor: Colors.red),
+        SnackBar(content: Text("Save failed: $e")),
       );
     }
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
+    final uid = user?.uid;
+
+    if (uid == null) {
+      return const Scaffold(
+        body: Center(child: Text("User not logged in")),
+      );
+    }
+
     return Scaffold(
       backgroundColor: bgGrey,
       drawer: const AppDrawer(),
 
-      // ✅ BOTTOM NAVIGATION ADDED HERE
-      bottomNavigationBar: const MainNavigation(currentIndex: 4),
+      // NOTE: adjust index if needed in your nav system
+      bottomNavigationBar: const MainNavigation(currentIndex: 3),
 
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryBlue))
           : CustomScrollView(
               slivers: [
-                _buildSliverHeader(),
+                _buildHeader(),
+
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionHeader("IDENTITY & CONTACT"),
-                        _buildProfileCard([
-                          _buildModernInput(
-                              nameController, "Full Name", Icons.badge_outlined),
-                          _buildModernInput(ageController, "Age",
-                              Icons.calendar_today_outlined,
+
+                        _section("PERSONAL INFO"),
+                        _card([
+                          _input(nameController, "Full Name", Icons.person),
+                          _input(ageController, "Age", Icons.calendar_today,
                               type: TextInputType.number),
-                          _buildModernInput(
-                              contactController,
-                              "Emergency Contact",
-                              Icons.contact_emergency_outlined,
+                          _input(contactController, "Contact", Icons.phone,
                               type: TextInputType.phone),
                         ]),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                        _buildSectionHeader("CLINICAL DATA"),
-                        _buildProfileCard([
+                        _section("MEDICAL INFO"),
+                        _card([
                           DropdownButtonFormField<String>(
                             value: genotype,
-                            decoration: _inputDecoration(
-                                "Blood Genotype", Icons.bloodtype_outlined),
+                            decoration: _dec("Genotype", Icons.bloodtype),
                             items: ["AA", "AS", "SS"]
-                                .map((g) => DropdownMenuItem(
-                                    value: g, child: Text(g)))
+                                .map((g) =>
+                                    DropdownMenuItem(value: g, child: Text(g)))
                                 .toList(),
-                            onChanged: (v) => setState(() => genotype = v!),
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() => genotype = v);
+                              }
+                            },
                           ),
                         ]),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                        _buildSectionHeader("SYSTEM PREFERENCES"),
-                        _buildProfileCard([
+                        _section("SETTINGS"),
+                        _card([
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text("Health Notifications",
-                                style: TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: const Text(
-                                "Receive alerts for hydration & medication"),
+                            title: const Text("Notifications"),
                             value: notifications,
                             activeColor: accentBlue,
                             onChanged: (v) =>
@@ -161,36 +186,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ]),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 30),
 
                         SizedBox(
                           width: double.infinity,
-                          height: 58,
+                          height: 55,
                           child: ElevatedButton(
                             onPressed: saveProfile,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryBlue,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
                             ),
                             child: const Text("SAVE PROFILE"),
                           ),
                         ),
 
-                        const SizedBox(height: 50),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
-                ),
+                )
               ],
             ),
     );
   }
 
-  Widget _buildSliverHeader() {
+  // ================= HEADER =================
+  Widget _buildHeader() {
     return SliverAppBar(
-      expandedHeight: 200,
+      expandedHeight: 180,
       pinned: true,
       backgroundColor: primaryBlue,
       flexibleSpace: FlexibleSpaceBar(
@@ -203,54 +226,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           child: const Center(
-            child: CircleAvatar(
-              radius: 40,
-              child: Icon(Icons.person, size: 40),
-            ),
+            child: Icon(Icons.person, size: 60, color: Colors.white),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  // ================= HELPERS =================
+  Widget _section(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 
-  Widget _buildProfileCard(List<Widget> children) {
+  Widget _card(List<Widget> children) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surfaceWhite,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(children: children),
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
+  InputDecoration _dec(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon),
       filled: true,
       fillColor: bgGrey,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
     );
   }
 
-  Widget _buildModernInput(
-      TextEditingController c, String label, IconData icon,
+  Widget _input(TextEditingController c, String label, IconData icon,
       {TextInputType type = TextInputType.text}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
         keyboardType: type,
-        decoration: _inputDecoration(label, icon),
+        decoration: _dec(label, icon),
       ),
     );
   }
