@@ -1,9 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import '../widgets/app_drawer.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -13,207 +8,282 @@ class SupportScreen extends StatefulWidget {
 }
 
 class _SupportScreenState extends State<SupportScreen> {
-  final user = FirebaseAuth.instance.currentUser;
-  final firestore = FirebaseFirestore.instance;
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
-  final TextEditingController controller = TextEditingController();
-  final ScrollController scrollController = ScrollController();
+  final List<Map<String, String>> emergencyContacts = const [
+    {"name": "Cameroon Ambulance", "number": "112"},
+    {"name": "Fire Brigade", "number": "118"},
+    {"name": "Police", "number": "117"},
+    {"name": "Sickle Cell Support", "number": "+237600000000"},
+    {"name": "Emergency Hospital", "number": "+237233123456"},
+  ];
 
-  List<Map<String, String>> messages = [];
-
-  List<String> emergencyContacts = [];
-
-  static const Color primary = Color(0xFF1E40AF);
-  static const Color danger = Color(0xFFB91C1C);
-  static const Color bg = Color(0xFFF8FAFC);
-
-  String get uid => user?.uid ?? "";
-
-  @override
-  void initState() {
-    super.initState();
-    loadContacts();
-
-    messages.add({
-      "role": "assistant",
+  final List<Map<String, String>> chatMessages = [
+    {
+      "role": "ai",
       "text":
-          "Hello 👋 I’m your SickleCare assistant. I can help you with pain, hydration, symptoms, and crisis advice."
-    });
-  }
-
-  Future<void> loadContacts() async {
-    if (uid.isEmpty) return;
-
-    final doc = await firestore.collection('users').doc(uid).get();
-
-    if (doc.exists) {
-      emergencyContacts =
-          List<String>.from(doc.data()?['emergencyContacts'] ?? []);
+          "Hello 👋\nI'm your health support assistant.\nDescribe your symptoms or situation and I'll try to help."
     }
-  }
+  ];
 
-  // ===================== OFFLINE AI BRAIN =====================
-  String generateReply(String input) {
-    final text = input.toLowerCase();
+  // ================= SEND MESSAGE =================
+  void sendMessage() {
+    final text = _messageController.text.trim();
 
-    if (text.contains("pain")) {
-      return "⚠️ Pain management tip:\n"
-          "- Drink water 💧\n"
-          "- Rest in a warm environment\n"
-          "- Use prescribed medication\n"
-          "If pain is severe (>7/10), contact a doctor immediately.";
-    }
-
-    if (text.contains("hydrate") || text.contains("water")) {
-      return "💧 Hydration advice:\n"
-          "- Aim for 2–3L water daily\n"
-          "- Drink small amounts frequently\n"
-          "- Avoid dehydration triggers like heat";
-    }
-
-    if (text.contains("fever")) {
-      return "🤒 Fever advice:\n"
-          "- Rest and stay hydrated\n"
-          "- Monitor temperature\n"
-          "- Seek medical help if persistent";
-    }
-
-    if (text.contains("crisis") || text.contains("emergency")) {
-      return "🚨 Sickle Cell Crisis Guidance:\n"
-          "- Stay calm\n"
-          "- Hydrate immediately\n"
-          "- Warm compress may help\n"
-          "- Contact emergency support if pain is severe";
-    }
-
-    if (text.contains("hello") || text.contains("hi")) {
-      return "Hello 👋 I'm here to support your daily health tracking.";
-    }
-
-    return "I understand. Can you describe your symptoms more clearly? "
-        "I can help with pain, hydration, fever, or crisis support.";
-  }
-
-  // ===================== SEND MESSAGE =====================
-  void sendMessage(String text) {
-    if (text.trim().isEmpty) return;
+    if (text.isEmpty) return;
 
     setState(() {
-      messages.add({"role": "user", "text": text});
-    });
-
-    controller.clear();
-    scrollToBottom();
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      final reply = generateReply(text);
-
-      setState(() {
-        messages.add({"role": "assistant", "text": reply});
+      chatMessages.add({
+        "role": "user",
+        "text": text,
       });
 
-      scrollToBottom();
+      chatMessages.add({
+        "role": "ai",
+        "text": getAIResponse(text),
+      });
     });
-  }
 
-  void scrollToBottom() {
+    _messageController.clear();
+
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (scrollController.hasClients) {
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
   }
 
-  // ===================== SOS =====================
-  void sendSOS() {
-    if (emergencyContacts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No emergency contact found")),
-      );
-      return;
+  // ================= AI LOGIC =================
+  String getAIResponse(String input) {
+    input = input.toLowerCase();
+
+    // PAIN
+    if (input.contains("pain")) {
+      return "Pain can have different causes. Please tell me where the pain is located and how severe it is.";
     }
 
-    final number = emergencyContacts.first;
+    // FEVER
+    else if (input.contains("fever")) {
+      return "A fever may indicate infection. Drink water, rest, and monitor your temperature carefully.";
+    }
 
-    final uri = Uri.parse(
-        "sms:$number?body=EMERGENCY: I need help for Sickle Cell crisis");
+    // HEADACHE
+    else if (input.contains("headache")) {
+      return "Headaches can result from stress, dehydration, or illness. Try resting and drinking water.";
+    }
 
-    launchUrl(uri);
+    // COUGH
+    else if (input.contains("cough")) {
+      return "Persistent cough may require medical attention if it lasts several days or causes breathing issues.";
+    }
+
+    // CHEST PAIN
+    else if (input.contains("chest")) {
+      return "Chest pain can be serious. Please seek emergency medical attention immediately if severe.";
+    }
+
+    // BREATHING
+    else if (input.contains("breath") ||
+        input.contains("breathing")) {
+      return "Difficulty breathing is a medical emergency. Please contact emergency services immediately.";
+    }
+
+    // SICKLE CELL
+    else if (input.contains("sickle")) {
+      return "Sickle cell crisis can become serious quickly. Stay hydrated and seek medical support if symptoms worsen.";
+    }
+
+    // STRESS
+    else if (input.contains("stress") ||
+        input.contains("anxiety")) {
+      return "Stress and anxiety can affect your health. Try resting and talking to someone you trust.";
+    }
+
+    // HELP
+    else if (input.contains("help")) {
+      return "I'm here to help. Please explain your symptoms or situation clearly.";
+    }
+
+    // GREETINGS
+    else if (input.contains("hello") ||
+        input.contains("hi")) {
+      return "Hello 👋 How are you feeling today?";
+    }
+
+    // THANK YOU
+    else if (input.contains("thank")) {
+      return "You're welcome 💙 Stay safe and take care of yourself.";
+    }
+
+    // DEFAULT SMART RESPONSE
+    else {
+      return "Thank you for sharing. Based on what you said, I recommend monitoring your symptoms carefully and seeking medical attention if things worsen.";
+    }
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
-      drawer: const AppDrawer(),
+      backgroundColor: Colors.grey.shade100,
 
       appBar: AppBar(
-        backgroundColor: primary,
-        title: const Text("Support AI"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.emergency, color: Colors.white),
-            onPressed: sendSOS,
-          )
-        ],
+        backgroundColor: Colors.red,
+        elevation: 0,
+        title: const Text(
+          "AI Health Support",
+          style: TextStyle(color: Colors.white),
+        ),
       ),
 
       body: Column(
         children: [
-          // SOS banner
+
+          // ================= EMERGENCY CONTACTS =================
           Container(
-            margin: const EdgeInsets.all(10),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: danger.withValues(alpha:0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
+            color: Colors.red.shade50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.warning, color: danger),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text("Emergency? Tap SOS to alert contact"),
+
+                const Text(
+                  "Emergency Contacts",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                ElevatedButton(
-                  onPressed: sendSOS,
-                  style: ElevatedButton.styleFrom(backgroundColor: danger),
-                  child: const Text("SOS"),
-                )
+
+                const SizedBox(height: 10),
+
+                SizedBox(
+                  height: 130,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: emergencyContacts.length,
+                    itemBuilder: (context, index) {
+
+                      final contact = emergencyContacts[index];
+
+                      return Container(
+                        width: 190,
+                        margin: const EdgeInsets.only(right: 10),
+
+                        child: Card(
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+
+                              children: [
+
+                                Text(
+                                  contact["name"]!,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 10),
+
+                                Text(
+                                  contact["number"]!,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                  ),
+                                ),
+
+                                const Spacer(),
+
+                                SizedBox(
+                                  width: double.infinity,
+
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      // Add phone launcher later
+                                    },
+
+                                    icon: const Icon(Icons.call),
+                                    label: const Text("Call"),
+
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
 
-          // CHAT LIST
+          // ================= CHAT =================
           Expanded(
             child: ListView.builder(
-              controller: scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: messages.length,
-              itemBuilder: (context, i) {
-                final msg = messages[i];
+              controller: _scrollController,
+              padding: const EdgeInsets.all(10),
+              itemCount: chatMessages.length,
+
+              itemBuilder: (context, index) {
+
+                final msg = chatMessages[index];
                 final isUser = msg["role"] == "user";
 
                 return Align(
-                  alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.all(12),
+
+                    padding: const EdgeInsets.all(14),
+
                     constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    decoration: BoxDecoration(
-                      color: isUser ? primary : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      maxWidth:
+                          MediaQuery.of(context).size.width * 0.75,
                     ),
+
+                    decoration: BoxDecoration(
+                      color: isUser
+                          ? Colors.blue
+                          : Colors.white,
+
+                      borderRadius: BorderRadius.circular(18),
+
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 5,
+                        )
+                      ],
+                    ),
+
                     child: Text(
-                      msg["text"] ?? "",
+                      msg["text"]!,
                       style: TextStyle(
-                        color: isUser ? Colors.white : Colors.black,
+                        color:
+                            isUser ? Colors.white : Colors.black87,
+                        fontSize: 15,
                       ),
                     ),
                   ),
@@ -222,31 +292,64 @@ class _SupportScreenState extends State<SupportScreen> {
             ),
           ),
 
-          // INPUT
+          // ================= INPUT =================
           Container(
             padding: const EdgeInsets.all(10),
             color: Colors.white,
+
             child: Row(
               children: [
+
                 Expanded(
                   child: TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      hintText: "Ask about pain, hydration, symptoms...",
-                      border: InputBorder.none,
+                    controller: _messageController,
+
+                    decoration: InputDecoration(
+                      hintText: "Describe your symptoms...",
+
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                     ),
-                    onSubmitted: sendMessage,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send, color: primary),
-                  onPressed: () => sendMessage(controller.text),
-                )
+
+                const SizedBox(width: 10),
+
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.red,
+
+                  child: IconButton(
+                    onPressed: sendMessage,
+
+                    icon: const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 }
