@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../widgets/app_drawer.dart';
+import '../widgets/main_navigation.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -14,299 +16,245 @@ class _RemindersScreenState extends State<RemindersScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
-  List<Map<String, dynamic>> reminders = [];
   final titleController = TextEditingController();
   TimeOfDay? selectedTime;
 
-  static const Color primaryBlue = Color(0xFF1E40AF);
-  static const Color bgGrey = Color(0xFFF8FAFC);
-  static const Color textMain = Color(0xFF0F172A);
-  static const Color successGreen = Color(0xFF15803D);
-  static const Color criticalRed = Color(0xFFB91C1C);
+  static const Color primary = Color(0xFF1E40AF);
+  static const Color bg = Color(0xFFF4F7FA);
+  static const Color cardColor = Colors.white;
 
   String get today {
     final now = DateTime.now();
-    return "${now.year}-${now.month}-${now.day}";
+    return "${now.year}-"
+        "${now.month.toString().padLeft(2, '0')}-"
+        "${now.day.toString().padLeft(2, '0')}";
   }
 
-  Future<void> loadReminders() async {
-    final uid = user?.uid;
-    if (uid == null) return;
-
-    final doc = await firestore
+  DocumentReference<Map<String, dynamic>> get docRef {
+    return firestore
         .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .doc(today)
-        .get();
-
-    if (!mounted) return;
-
-    if (doc.exists) {
-      setState(() {
-        reminders = List<Map<String, dynamic>>.from(
-          doc.data()?['reminders'] ?? [],
-        );
-      });
-    }
+        .doc(user!.uid)
+        .collection('reminders')
+        .doc(today);
   }
 
-  Future<void> saveReminders() async {
-    final uid = user?.uid;
-    if (uid == null) return;
+  Stream<List<Map<String, dynamic>>> get remindersStream {
+    return docRef.snapshots().map((doc) {
+      if (!doc.exists) return [];
+      return List<Map<String, dynamic>>.from(
+        doc.data()?['reminders'] ?? [],
+      );
+    });
+  }
 
-    await firestore
-        .collection('users')
-        .doc(uid)
-        .collection('daily')
-        .doc(today)
-        .set({
+  Future<void> save(List<Map<String, dynamic>> reminders) async {
+    await docRef.set({
       'reminders': reminders,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 
-  void addReminder() {
-    if (titleController.text.isEmpty || selectedTime == null) return;
+  Future<void> add(List<Map<String, dynamic>> current) async {
+    if (titleController.text.trim().isEmpty || selectedTime == null) return;
 
-    setState(() {
-      reminders.add({
-        'title': titleController.text,
-        'hour': selectedTime!.hour,
-        'minute': selectedTime!.minute,
-        'completed': false,
-      });
+    final updated = List<Map<String, dynamic>>.from(current);
 
-      titleController.clear();
-      selectedTime = null;
+    updated.add({
+      'title': titleController.text.trim(),
+      'hour': selectedTime!.hour,
+      'minute': selectedTime!.minute,
+      'completed': false,
     });
 
-    saveReminders();
+    titleController.clear();
+    selectedTime = null;
+
+    await save(updated);
   }
 
-  void toggleComplete(int index) {
-    setState(() {
-      reminders[index]['completed'] =
-          !(reminders[index]['completed'] ?? false);
-    });
-
-    saveReminders();
+  Future<void> toggle(List<Map<String, dynamic>> current, int index) async {
+    final updated = List<Map<String, dynamic>>.from(current);
+    updated[index]['completed'] =
+        !(updated[index]['completed'] ?? false);
+    await save(updated);
   }
 
-  void deleteReminder(int index) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete Reminder"),
-        content: const Text("Are you sure you want to remove this reminder?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() => reminders.removeAt(index));
-              saveReminders();
-              Navigator.pop(context);
-            },
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+  Future<void> delete(List<Map<String, dynamic>> current, int index) async {
+    final updated = List<Map<String, dynamic>>.from(current);
+    updated.removeAt(index);
+    await save(updated);
   }
 
   @override
-  void initState() {
-    super.initState();
-    loadReminders();
+  void dispose() {
+    titleController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgGrey,
+      backgroundColor: bg,
+
+      // ================= DRAWER =================
       drawer: const AppDrawer(),
 
+      // ================= BOTTOM NAV =================
+      bottomNavigationBar: const MainNavigation(currentIndex: 3),
+
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: primaryBlue),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: primary),
         title: const Text(
-          "DAILY SCHEDULE",
+          "Daily Reminders",
           style: TextStyle(
-            color: textMain,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.5,
-            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
         ),
       ),
 
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _header()),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: remindersStream,
+        builder: (context, snapshot) {
+          final reminders = snapshot.data ?? [];
 
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: _createCard(),
-            ),
-          ),
+          return Column(
+            children: [
+              // ================= INPUT =================
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        hintText: "Enter reminder",
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
 
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                "ACTIVE REMINDERS",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                          ),
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+
+                            if (picked != null) {
+                              setState(() => selectedTime = picked);
+                            }
+                          },
+                          icon: const Icon(Icons.access_time),
+                          label: Text(
+                            selectedTime == null
+                                ? "Pick Time"
+                                : selectedTime!.format(context),
+                          ),
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14),
+                            ),
+                            onPressed: () => add(reminders),
+                            child: const Text("Add Reminder"),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
 
-          reminders.isEmpty
-              ? const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      "No reminders yet. Add your first task.",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.all(20),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = reminders[index];
-                        final time =
-                            "${item['hour']}:${item['minute'].toString().padLeft(2, '0')}";
+              const SizedBox(height: 10),
 
-                        return _tile(index, item['title'], time,
-                            item['completed'] ?? false);
-                      },
-                      childCount: reminders.length,
-                    ),
-                  ),
-                ),
+              // ================= LIST =================
+              Expanded(
+                child: reminders.isEmpty
+                    ? const Center(
+                        child: Text(
+                          "No reminders yet.\nAdd your first task ✨",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: reminders.length,
+                        itemBuilder: (context, index) {
+                          final item = reminders[index];
 
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          SliverToBoxAdapter(child: _footer()),
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
-        ],
-      ),
-    );
-  }
+                          final time =
+                              "${item['hour']}:${(item['minute'] ?? 0).toString().padLeft(2, '0')}";
 
-  Widget _header() {
-    final completed = reminders.where((e) => e['completed'] == true).length;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Today's Progress",
-                  style: TextStyle(color: Colors.grey)),
-              Text(
-                "$completed / ${reminders.length} done",
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                )
+                              ],
+                            ),
+                            child: ListTile(
+                              leading: Checkbox(
+                                value: item['completed'] ?? false,
+                                onChanged: (_) =>
+                                    toggle(reminders, index),
+                              ),
+                              title: Text(
+                                item['title'],
+                                style: TextStyle(
+                                  decoration: item['completed'] == true
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text("Time: $time"),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
+                                onPressed: () =>
+                                    delete(reminders, index),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
-          ),
-          const Icon(Icons.calendar_month, color: primaryBlue),
-        ],
-      ),
-    );
-  }
-
-  Widget _createCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          TextField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              hintText: "Add reminder",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            onPressed: () async {
-              final picked = await showTimePicker(
-                context: context,
-                initialTime: TimeOfDay.now(),
-              );
-              if (picked != null) setState(() => selectedTime = picked);
-            },
-            child: Text(selectedTime == null
-                ? "Pick Time"
-                : selectedTime!.format(context)),
-          ),
-
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            onPressed: addReminder,
-            child: const Text("Add"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tile(int index, String title, String time, bool done) {
-    return Card(
-      child: ListTile(
-        leading: Checkbox(
-          value: done,
-          activeColor: successGreen,
-          onChanged: (_) => toggleComplete(index),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            decoration: done ? TextDecoration.lineThrough : null,
-          ),
-        ),
-        subtitle: Text("Time: $time"),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: criticalRed),
-          onPressed: () => deleteReminder(index),
-        ),
-      ),
-    );
-  }
-
-  Widget _footer() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(20),
-        child: Text(
-          "Consistency builds strength 💙",
-          textAlign: TextAlign.center,
-        ),
+          );
+        },
       ),
     );
   }

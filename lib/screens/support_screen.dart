@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/app_drawer.dart';
 
@@ -19,78 +19,105 @@ class _SupportScreenState extends State<SupportScreen> {
   final TextEditingController controller = TextEditingController();
   final ScrollController scrollController = ScrollController();
 
-  bool isLoading = false;
+  List<Map<String, String>> messages = [];
 
-  String get uid => user!.uid;
+  List<String> emergencyContacts = [];
 
-  CollectionReference get chatRef => firestore
-      .collection('users')
-      .doc(uid)
-      .collection('chat')
-      .doc('messages')
-      .collection('items');
+  static const Color primary = Color(0xFF1E40AF);
+  static const Color danger = Color(0xFFB91C1C);
+  static const Color bg = Color(0xFFF8FAFC);
 
-  // ================= SEND MESSAGE =================
-  Future<void> sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+  String get uid => user?.uid ?? "";
 
-    controller.clear();
+  @override
+  void initState() {
+    super.initState();
+    loadContacts();
 
-    // 1. Save user message
-    await chatRef.add({
-      "role": "user",
-      "content": text,
-      "timestamp": FieldValue.serverTimestamp(),
+    messages.add({
+      "role": "assistant",
+      "text":
+          "Hello 👋 I’m your SickleCare assistant. I can help you with pain, hydration, symptoms, and crisis advice."
     });
+  }
 
-    scrollToBottom();
+  Future<void> loadContacts() async {
+    if (uid.isEmpty) return;
 
-    setState(() => isLoading = true);
+    final doc = await firestore.collection('users').doc(uid).get();
 
-    try {
-      // 2. Call Firebase AI Function
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('sickleCareAI');
+    if (doc.exists) {
+      emergencyContacts =
+          List<String>.from(doc.data()?['emergencyContacts'] ?? []);
+    }
+  }
 
-      final snapshot = await chatRef.orderBy("timestamp").get();
+  // ===================== OFFLINE AI BRAIN =====================
+  String generateReply(String input) {
+    final text = input.toLowerCase();
 
-      final messages = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          "role": data["role"],
-          "content": data["content"]
-        };
-      }).toList();
-
-      final result = await callable.call({
-        "messages": messages,
-      });
-
-      final reply = result.data["reply"];
-
-      // 3. Save AI response
-      await chatRef.add({
-        "role": "assistant",
-        "content": reply,
-        "timestamp": FieldValue.serverTimestamp(),
-      });
-
-    } catch (e) {
-      await chatRef.add({
-        "role": "assistant",
-        "content":
-            "I'm having trouble connecting right now. Please try again.",
-        "timestamp": FieldValue.serverTimestamp(),
-      });
+    if (text.contains("pain")) {
+      return "⚠️ Pain management tip:\n"
+          "- Drink water 💧\n"
+          "- Rest in a warm environment\n"
+          "- Use prescribed medication\n"
+          "If pain is severe (>7/10), contact a doctor immediately.";
     }
 
-    setState(() => isLoading = false);
+    if (text.contains("hydrate") || text.contains("water")) {
+      return "💧 Hydration advice:\n"
+          "- Aim for 2–3L water daily\n"
+          "- Drink small amounts frequently\n"
+          "- Avoid dehydration triggers like heat";
+    }
 
+    if (text.contains("fever")) {
+      return "🤒 Fever advice:\n"
+          "- Rest and stay hydrated\n"
+          "- Monitor temperature\n"
+          "- Seek medical help if persistent";
+    }
+
+    if (text.contains("crisis") || text.contains("emergency")) {
+      return "🚨 Sickle Cell Crisis Guidance:\n"
+          "- Stay calm\n"
+          "- Hydrate immediately\n"
+          "- Warm compress may help\n"
+          "- Contact emergency support if pain is severe";
+    }
+
+    if (text.contains("hello") || text.contains("hi")) {
+      return "Hello 👋 I'm here to support your daily health tracking.";
+    }
+
+    return "I understand. Can you describe your symptoms more clearly? "
+        "I can help with pain, hydration, fever, or crisis support.";
+  }
+
+  // ===================== SEND MESSAGE =====================
+  void sendMessage(String text) {
+    if (text.trim().isEmpty) return;
+
+    setState(() {
+      messages.add({"role": "user", "text": text});
+    });
+
+    controller.clear();
     scrollToBottom();
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      final reply = generateReply(text);
+
+      setState(() {
+        messages.add({"role": "assistant", "text": reply});
+      });
+
+      scrollToBottom();
+    });
   }
 
   void scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
@@ -101,116 +128,120 @@ class _SupportScreenState extends State<SupportScreen> {
     });
   }
 
-  // ================= UI =================
+  // ===================== SOS =====================
+  void sendSOS() {
+    if (emergencyContacts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No emergency contact found")),
+      );
+      return;
+    }
+
+    final number = emergencyContacts.first;
+
+    final uri = Uri.parse(
+        "sms:$number?body=EMERGENCY: I need help for Sickle Cell crisis");
+
+    launchUrl(uri);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: bg,
       drawer: const AppDrawer(),
-      backgroundColor: const Color(0xFFF4F7FA),
 
       appBar: AppBar(
-        title: const Text("Care AI Chat 💬"),
-        backgroundColor: const Color(0xFF1E40AF),
+        backgroundColor: primary,
+        title: const Text("Support AI"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.emergency, color: Colors.white),
+            onPressed: sendSOS,
+          )
+        ],
       ),
 
       body: Column(
         children: [
+          // SOS banner
+          Container(
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: danger.withValues(alpha:0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.warning, color: danger),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text("Emergency? Tap SOS to alert contact"),
+                ),
+                ElevatedButton(
+                  onPressed: sendSOS,
+                  style: ElevatedButton.styleFrom(backgroundColor: danger),
+                  child: const Text("SOS"),
+                )
+              ],
+            ),
+          ),
 
-          // ================= CHAT STREAM =================
+          // CHAT LIST
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: chatRef.orderBy("timestamp").snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            child: ListView.builder(
+              controller: scrollController,
+              padding: const EdgeInsets.all(12),
+              itemCount: messages.length,
+              itemBuilder: (context, i) {
+                final msg = messages[i];
+                final isUser = msg["role"] == "user";
 
-                final docs = snapshot.data!.docs;
-
-                return ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final data =
-                        docs[index].data() as Map<String, dynamic>;
-
-                    final isUser = data["role"] == "user";
-
-                    return Align(
-                      alignment: isUser
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 5),
-                        padding: const EdgeInsets.all(12),
-                        constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.75,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUser
-                              ? const Color(0xFF1E40AF)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              blurRadius: 4,
-                              color: Colors.black.withOpacity(0.05),
-                            )
-                          ],
-                        ),
-                        child: Text(
-                          data["content"] ?? "",
-                          style: TextStyle(
-                            color: isUser
-                                ? Colors.white
-                                : Colors.black87,
-                            fontSize: 14,
-                          ),
-                        ),
+                return Align(
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.all(12),
+                    constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75),
+                    decoration: BoxDecoration(
+                      color: isUser ? primary : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      msg["text"] ?? "",
+                      style: TextStyle(
+                        color: isUser ? Colors.white : Colors.black,
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 );
               },
             ),
           ),
 
-          // ================= TYPING INDICATOR =================
-          if (isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8),
-              child: Text(
-                "AI is thinking...",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-
-          // ================= INPUT =================
+          // INPUT
           Container(
             padding: const EdgeInsets.all(10),
             color: Colors.white,
             child: Row(
               children: [
-
                 Expanded(
                   child: TextField(
                     controller: controller,
                     decoration: const InputDecoration(
-                      hintText: "Type your message...",
+                      hintText: "Ask about pain, hydration, symptoms...",
                       border: InputBorder.none,
                     ),
                     onSubmitted: sendMessage,
                   ),
                 ),
-
                 IconButton(
-                  icon: const Icon(Icons.send,
-                      color: Color(0xFF1E40AF)),
-                  onPressed: () =>
-                      sendMessage(controller.text),
-                ),
+                  icon: const Icon(Icons.send, color: primary),
+                  onPressed: () => sendMessage(controller.text),
+                )
               ],
             ),
           ),

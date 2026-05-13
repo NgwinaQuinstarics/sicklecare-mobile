@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'login.dart';
 import 'screens/home_screen.dart';
 
@@ -18,7 +19,9 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
+        final user = snapshot.data;
+
+        if (user != null) {
           return const HomeScreen();
         }
 

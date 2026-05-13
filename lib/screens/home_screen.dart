@@ -3,14 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/app_drawer.dart';
-import 'hydration_nutrition_screen.dart';
-import 'tracker_screen.dart';
-import 'reminders_screen.dart';
-import 'support_screen.dart';
-import 'history_screen.dart';
-import 'weather_screen.dart';
+import '../widgets/main_navigation.dart';
+
 import '../utils/date_helper.dart';
-import '../models/health_data.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,20 +20,26 @@ class _HomeScreenState extends State<HomeScreen>
   final firestore = FirebaseFirestore.instance;
 
   late AnimationController _fadeController;
-  late Animation<double> _fade;
+  late Animation<double> _fadeAnimation;
 
   double painLevel = 0;
+
+  static const Color primaryBlue = Color(0xFF1E40AF);
+  static const Color background = Color(0xFFF8FAFC);
+  static const Color textMain = Color(0xFF0F172A);
 
   @override
   void initState() {
     super.initState();
 
-    _fadeController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
 
-    _fade = CurvedAnimation(
+    _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
-      curve: Curves.easeIn,
+      curve: Curves.easeInOut,
     );
 
     _fadeController.forward();
@@ -69,223 +70,400 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final uid = user?.uid;
 
-    const brandBlue = Color(0xFF1E40AF);
-    const softBg = Color(0xFFF8FAFC);
-    const textMain = Color(0xFF0F172A);
-    const accentBrown = Color(0xFF5D4037);
-    const criticalRed = Color(0xFFB91C1C);
+    if (uid == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text("User not authenticated"),
+        ),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: softBg,
+      backgroundColor: background,
+
       drawer: const AppDrawer(),
+
       appBar: AppBar(
+        elevation: 0,
         backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: brandBlue),
+
+        iconTheme: const IconThemeData(
+          color: primaryBlue,
+        ),
+
         title: const Text(
           "SickleCare",
-          style: TextStyle(color: textMain, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: textMain,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
-      body: uid == null
-          ? const Center(child: Text("Authentication Required"))
-          : StreamBuilder<DocumentSnapshot>(
-              stream: firestore
-                  .collection('users')
-                  .doc(uid)
-                  .collection('daily')
-                  .doc(DateHelper.today())
-                  .snapshots(),
+      // 🔥 BOTTOM NAVIGATION
+      bottomNavigationBar: const MainNavigation(
+        currentIndex: 0,
+      ),
 
-              builder: (context, snapshot) {
-                final data = HealthData.fromMap(
-                    snapshot.data?.data() as Map<String, dynamic>?);
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: firestore
+            .collection('users')
+            .doc(uid)
+            .collection('daily')
+            .doc(DateHelper.today())
+            .snapshots(),
 
-                painLevel = data.painLevel;
+        builder: (context, snapshot) {
+          double hydration = 0;
+          double pain = 0;
+          List meals = [];
 
-                return FadeTransition(
-                  opacity: _fade,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          if (snapshot.hasData && snapshot.data!.data() != null) {
+            final data = snapshot.data!.data()!;
+
+            hydration = (data['hydration'] ?? 0).toDouble();
+
+            pain = (data['painLevel'] ?? 0).toDouble();
+
+            meals = data['meals'] ?? [];
+          }
+
+          painLevel = pain;
+
+          return FadeTransition(
+            opacity: _fadeAnimation,
+
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // ================= HEADER =================
+
+                  Container(
+                    padding: const EdgeInsets.all(22),
+
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF1E40AF),
+                          Color(0xFF3B82F6),
+                        ],
+                      ),
+
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+
+                    child: Row(
                       children: [
 
-                        const SizedBox(height: 20),
-
-                        Row(
-                          children: const [
-                            CircleAvatar(
-                              radius: 26,
-                              backgroundColor: Colors.white,
-                              child: Icon(Icons.person, color: Colors.blue),
-                            ),
-                            SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("Welcome back",
-                                    style: TextStyle(color: Colors.grey)),
-                                Text("Warrior",
-                                    style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 25),
-
-                        Row(
-                          children: [
-                            _metric("Hydration",
-                                "${data.hydration.toStringAsFixed(1)}L",
-                                Icons.water_drop, brandBlue),
-                            const SizedBox(width: 12),
-                            _metric("Meals",
-                                "${data.meals.length}",
-                                Icons.restaurant, accentBrown),
-                          ],
-                        ),
-
-                        const SizedBox(height: 25),
-
                         Container(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(14),
+
                           decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+
+                          child: const Icon(
+                            Icons.favorite,
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text("Pain Level",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  Text("${painLevel.toInt()}/10"),
-                                ],
-                              ),
-                              Slider(
-                                value: painLevel,
-                                min: 0,
-                                max: 10,
-                                divisions: 10,
-                                activeColor: brandBlue,
-                                onChanged: (value) {
-                                  setState(() => painLevel = value);
-                                  savePainLevel(value);
-                                },
-                              ),
-                            ],
+                            size: 32,
                           ),
                         ),
 
-                        const SizedBox(height: 25),
+                        const SizedBox(width: 18),
 
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          children: [
-                            _tile("Health", Icons.favorite, brandBlue,
-                                () => _nav(const HydrationNutritionScreen())),
-                            _tile("Tracker", Icons.assignment, criticalRed,
-                                () => _nav(const TrackerScreen())),
-                            _tile("Reminders", Icons.alarm, Colors.orange,
-                                () => _nav(const RemindersScreen())),
-                            _tile("Support", Icons.support_agent, Colors.teal,
-                                () => _nav(const SupportScreen())),
-                            _tile("History", Icons.bar_chart, accentBrown,
-                                () => _nav(const HistoryScreen())),
-                            _tile("Weather", Icons.cloud, Colors.blueGrey,
-                                () => _nav(const WeatherScreen())),
-                          ],
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        const Center(
+                        Expanded(
                           child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+
                             children: [
-                              Icon(Icons.favorite, color: Colors.red),
-                              SizedBox(height: 10),
-                              Text(
-                                "Your strength is in consistency.",
+
+                              const Text(
+                                "Welcome Back",
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16),
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
                               ),
-                              SizedBox(height: 5),
+
+                              const SizedBox(height: 6),
+
                               Text(
-                                "Every small action builds a healthier tomorrow.",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey),
+                                user?.email ?? "User",
+
+                                overflow: TextOverflow.ellipsis,
+
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
                               ),
                             ],
                           ),
                         ),
-
-                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
-                );
-              },
+
+                  const SizedBox(height: 25),
+
+                  // ================= METRICS =================
+
+                  Row(
+                    children: [
+
+                      Expanded(
+                        child: _metricCard(
+                          title: "Hydration",
+                          value: "$hydration L",
+                          icon: Icons.water_drop,
+                          color: Colors.blue,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: _metricCard(
+                          title: "Meals",
+                          value: meals.length.toString(),
+                          icon: Icons.restaurant,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  // ================= PAIN TRACKER =================
+
+                  Container(
+                    padding: const EdgeInsets.all(22),
+
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+
+                      borderRadius: BorderRadius.circular(26),
+
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
+
+                        Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+
+                          children: [
+
+                            const Text(
+                              "Pain Level",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+
+                              decoration: BoxDecoration(
+                                color: primaryBlue.withValues(alpha: 0.1),
+
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+
+                              child: Text(
+                                "${painLevel.toInt()}/10",
+
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        Slider(
+                          value: painLevel,
+                          min: 0,
+                          max: 10,
+                          divisions: 10,
+                          activeColor: primaryBlue,
+
+                          onChanged: (value) async {
+                            setState(() {
+                              painLevel = value;
+                            });
+
+                            await savePainLevel(value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  // ================= DAILY TIP =================
+
+                  Container(
+                    padding: const EdgeInsets.all(22),
+
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+
+                      borderRadius: BorderRadius.circular(26),
+
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+
+                    child: const Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
+
+                        Row(
+                          children: [
+
+                            Icon(
+                              Icons.lightbulb,
+                              color: Colors.orange,
+                            ),
+
+                            SizedBox(width: 10),
+
+                            Text(
+                              "Daily Wellness Tip",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 14),
+
+                        Text(
+                          "Stay hydrated, rest properly, avoid stress, and follow your medication reminders consistently to reduce sickle cell complications.",
+
+                          style: TextStyle(
+                            color: Colors.grey,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+                ],
+              ),
             ),
-    );
-  }
-
-  Widget _metric(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 10),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(title),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _tile(String label, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 8),
-            Text(label),
-          ],
-        ),
+  Widget _metricCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+
+      decoration: BoxDecoration(
+        color: Colors.white,
+
+        borderRadius: BorderRadius.circular(22),
+
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+
+        children: [
+
+          Container(
+            padding: const EdgeInsets.all(10),
+
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+
+              borderRadius: BorderRadius.circular(14),
+            ),
+
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Text(
+            value,
+
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.grey,
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  void _nav(Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 }

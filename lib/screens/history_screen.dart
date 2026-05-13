@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../widgets/app_drawer.dart';
+import '../widgets/main_navigation.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -20,32 +22,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
-  List<FlSpot> painSpots = [];
-  List<FlSpot> hydrationSpots = [];
-  List<FlSpot> adherenceSpots = [];
+  final List<FlSpot> painSpots = [];
+  final List<FlSpot> hydrationSpots = [];
 
-  List<Map<String, dynamic>> logs = [];
-  List<Map<String, dynamic>> alerts = [];
+  final List<Map<String, dynamic>> logs = [];
+  final List<Map<String, dynamic>> alerts = [];
 
   bool loading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    loadHistory();
-  }
+  static const Color primaryBlue = Color(0xFF1565C0);
+  static const Color background = Color(0xFFF4F7FA);
 
   Future<void> loadHistory() async {
     final uid = user?.uid;
+
     if (uid == null) return;
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
 
-    painSpots.clear();
-    hydrationSpots.clear();
-    adherenceSpots.clear();
-    logs.clear();
-    alerts.clear();
+      painSpots.clear();
+      hydrationSpots.clear();
+      logs.clear();
+      alerts.clear();
+    });
 
     try {
       final snapshot = await firestore
@@ -54,46 +54,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
           .collection('daily')
           .get();
 
+      final docs = snapshot.docs.toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
+
       int index = 0;
 
-      for (var doc in snapshot.docs) {
+      for (final doc in docs) {
         final data = doc.data();
 
         final pain = (data['painLevel'] ?? 0).toDouble();
         final hydration = (data['hydration'] ?? 0).toDouble();
-        final medication = data['medicationTaken'] ?? false;
 
-        final adherence = medication ? 10.0 : 0.0;
+        painSpots.add(
+          FlSpot(index.toDouble(), pain),
+        );
 
-        painSpots.add(FlSpot(index.toDouble(), pain));
-        hydrationSpots.add(FlSpot(index.toDouble(), hydration));
-        adherenceSpots.add(FlSpot(index.toDouble(), adherence));
+        hydrationSpots.add(
+          FlSpot(index.toDouble(), hydration),
+        );
 
         logs.add({
           'id': doc.id,
           'pain': pain,
           'hydration': hydration,
-          'adherence': adherence,
         });
 
         if (pain >= 7) {
           alerts.add({
-            'id': "${doc.id}_pain",
-            'message': "⚠️ High pain on ${doc.id}"
+            'id': '${doc.id}_pain',
+            'message': '⚠️ High pain detected on ${doc.id}',
           });
         }
 
         if (hydration < 2) {
           alerts.add({
-            'id': "${doc.id}_hydration",
-            'message': "💧 Low hydration on ${doc.id}"
-          });
-        }
-
-        if (!medication) {
-          alerts.add({
-            'id': "${doc.id}_med",
-            'message': "💊 Medication missed on ${doc.id}"
+            'id': '${doc.id}_water',
+            'message': '💧 Low hydration detected on ${doc.id}',
           });
         }
 
@@ -104,12 +100,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     if (mounted) {
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
     }
   }
 
   Future<void> deleteRecord(String id) async {
     final uid = user?.uid;
+
     if (uid == null) return;
 
     await firestore
@@ -119,22 +118,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .doc(id)
         .delete();
 
-    loadHistory();
+    await loadHistory();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Record deleted"),
+      ),
+    );
   }
 
   Future<void> exportCSV() async {
-    String csv = "Date,Pain,Hydration,Adherence\n";
+    String csv = "Date,Pain,Hydration\n";
 
-    for (var log in logs) {
+    for (final log in logs) {
       csv +=
-          "${log['id']},${log['pain']},${log['hydration']},${log['adherence']}\n";
+          "${log['id']},${log['pain']},${log['hydration']}\n";
     }
 
     final dir = await getTemporaryDirectory();
+
     final file = File("${dir.path}/history.csv");
 
     await file.writeAsString(csv);
-    await Share.shareXFiles([XFile(file.path)]);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: "SickleCare History Export",
+    );
   }
 
   Future<void> exportPDF() async {
@@ -142,142 +154,325 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     pdf.addPage(
       pw.Page(
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text("SickleCare Report"),
-            pw.SizedBox(height: 10),
-            pw.Text("Total Records: ${logs.length}"),
-          ],
-        ),
+        build: (context) {
+          return pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment:
+                  pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  "SickleCare Health Report",
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+
+                pw.SizedBox(height: 20),
+
+                pw.Text(
+                  "Total Records: ${logs.length}",
+                ),
+
+                pw.SizedBox(height: 20),
+
+                ...logs.map(
+                  (log) => pw.Padding(
+                    padding:
+                        const pw.EdgeInsets.only(bottom: 10),
+                    child: pw.Text(
+                      "${log['id']}  |  Pain: ${log['pain']}  |  Water: ${log['hydration']}L",
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
 
     final dir = await getTemporaryDirectory();
-    final file = File("${dir.path}/report.pdf");
 
-    await file.writeAsBytes(await pdf.save());
+    final file = File("${dir.path}/history_report.pdf");
 
-    await Share.shareXFiles([XFile(file.path)]);
+    await file.writeAsBytes(
+      await pdf.save(),
+    );
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: "SickleCare PDF Report",
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadHistory();
   }
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFFF4F7FA);
-    const primaryBlue = Color(0xFF1A56BE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: background,
+
       drawer: const AppDrawer(),
 
+      bottomNavigationBar:
+          const MainNavigation(currentIndex: 2),
+
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
+        backgroundColor: Colors.white,
+
+        iconTheme: const IconThemeData(
+          color: primaryBlue,
+        ),
+
         title: const Text(
           "Health History",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        iconTheme: const IconThemeData(color: primaryBlue),
+
         actions: [
           IconButton(
             onPressed: exportCSV,
-            icon: const Icon(Icons.table_chart),
+            icon: const Icon(
+              Icons.table_chart_rounded,
+            ),
           ),
+
           IconButton(
             onPressed: exportPDF,
-            icon: const Icon(Icons.picture_as_pdf),
+            icon: const Icon(
+              Icons.picture_as_pdf_rounded,
+            ),
           ),
         ],
       ),
 
       body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (alerts.isNotEmpty) ...[
-                  const Text(
-                    "Health Alerts",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : RefreshIndicator(
+              onRefresh: loadHistory,
+              child: ListView(
+                padding: const EdgeInsets.all(18),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF1565C0),
+                          Color(0xFF0D47A1),
+                        ],
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(24),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Health Analytics",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+
+                        SizedBox(height: 8),
+
+                        Text(
+                          "Track your hydration and pain history over time.",
+                          style: TextStyle(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  ...alerts.map((alert) => Card(
-                        color: Colors.red.shade100,
+
+                  const SizedBox(height: 24),
+
+                  if (alerts.isNotEmpty) ...[
+                    const Text(
+                      "Health Alerts",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    ...alerts.map(
+                      (alert) => Container(
+                        margin:
+                            const EdgeInsets.only(
+                          bottom: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              Colors.red.shade50,
+                          borderRadius:
+                              BorderRadius
+                                  .circular(18),
+                        ),
                         child: ListTile(
-                          leading: const Icon(Icons.warning),
-                          title: Text(alert['message']),
+                          leading: const Icon(
+                            Icons.warning_rounded,
+                            color: Colors.red,
+                          ),
+                          title: Text(
+                            alert['message'],
+                          ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.close),
+                            icon: const Icon(
+                              Icons.close,
+                            ),
                             onPressed: () {
                               setState(() {
                                 alerts.removeWhere(
-                                    (a) => a['id'] == alert['id']);
+                                  (a) =>
+                                      a['id'] ==
+                                      alert['id'],
+                                );
                               });
                             },
                           ),
                         ),
-                      )),
-                  const SizedBox(height: 20),
-                ],
-
-                _chart("Pain Trend", painSpots),
-                const SizedBox(height: 20),
-                _chart("Hydration Trend", hydrationSpots),
-                const SizedBox(height: 20),
-                _chart("Medication Adherence", adherenceSpots),
-
-                const SizedBox(height: 20),
-
-                const Text(
-                  "History Records",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 10),
-
-                ...logs.map((log) => Card(
-                      child: ListTile(
-                        title: Text(log['id']),
-                        subtitle: Text(
-                          "Pain: ${log['pain']} | Water: ${log['hydration']} | Adherence: ${log['adherence']}/10",
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => deleteRecord(log['id']),
-                        ),
                       ),
-                    )),
-              ],
+                    ),
+
+                    const SizedBox(height: 20),
+                  ],
+
+                  _chartCard(
+                    title: "Pain Trend",
+                    subtitle:
+                        "Daily pain level analysis",
+                    spots: painSpots,
+                    color: Colors.red,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _chartCard(
+                    title: "Hydration Trend",
+                    subtitle:
+                        "Daily water intake analysis",
+                    spots: hydrationSpots,
+                    color: Colors.blue,
+                  ),
+
+                  const SizedBox(height: 28),
+                ],
+              ),
             ),
     );
   }
 
-  Widget _chart(String title, List<FlSpot> spots) {
+  Widget _chartCard({
+    required String title,
+    required String subtitle,
+    required List<FlSpot> spots,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
+
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: 4),
+
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
           SizedBox(
-            height: 200,
+            height: 220,
+
             child: LineChart(
               LineChartData(
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(show: false),
+                minY: 0,
+                maxY: 10,
+
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                ),
+
+                borderData: FlBorderData(
+                  show: false,
+                ),
+
+                titlesData: FlTitlesData(
+                  show: false,
+                ),
+
                 lineBarsData: [
                   LineChartBarData(
-                    spots: spots,
+                    spots: spots.isEmpty
+                        ? [
+                            const FlSpot(0, 0)
+                          ]
+                        : spots,
+
                     isCurved: true,
-                    dotData: FlDotData(show: false),
+
+                    color: color,
+
+                    barWidth: 4,
+
+                    dotData: const FlDotData(
+                      show: true,
+                    ),
+
+                    belowBarData:
+                        BarAreaData(
+                      show: true,
+                      color: color.withValues(alpha: 0.15),
+                    ),
                   ),
                 ],
               ),

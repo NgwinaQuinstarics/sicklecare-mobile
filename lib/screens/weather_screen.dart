@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
 
 import '../widgets/app_drawer.dart';
+import '../widgets/main_navigation.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -128,7 +129,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
+
       drawer: const AppDrawer(),
+
+      // ================= BOTTOM NAV =================
+      bottomNavigationBar: const MainNavigation(currentIndex: 3),
 
       appBar: AppBar(
         title: const Text("Weather"),
@@ -252,8 +257,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           LineChartBarData(
                             spots: List.generate(
                               hourlyTemps.length,
-                              (i) => FlSpot(
-                                  i.toDouble(), hourlyTemps[i]),
+                              (i) => FlSpot(i.toDouble(), hourlyTemps[i]),
                             ),
                             isCurved: true,
                             barWidth: 3,
@@ -285,8 +289,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         title: Text("Day ${i + 1}"),
                         trailing: Text(
                           "${dailyTemps[i].toStringAsFixed(1)}°C",
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     );

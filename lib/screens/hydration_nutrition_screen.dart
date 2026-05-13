@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/app_drawer.dart';
+import '../widgets/main_navigation.dart';
 
 class HydrationNutritionScreen extends StatefulWidget {
   const HydrationNutritionScreen({super.key});
@@ -13,7 +15,8 @@ class HydrationNutritionScreen extends StatefulWidget {
       _HydrationNutritionScreenState();
 }
 
-class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
+class _HydrationNutritionScreenState
+    extends State<HydrationNutritionScreen> {
   final user = FirebaseAuth.instance.currentUser;
   final firestore = FirebaseFirestore.instance;
 
@@ -21,31 +24,52 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
   List<String> meals = [];
   final mealController = TextEditingController();
 
-  bool saving = false;
+  Timer? debounce;
   bool isSliding = false;
 
-  Timer? debounce;
+  static const Color brandBlue = Color(0xFF1E40AF);
+  static const Color softBg = Color(0xFFF8FAFC);
 
-  // ✅ FIXED DATE FORMAT (CRITICAL)
+  // ================= DATE =================
+
   String get today {
     final now = DateTime.now();
-    return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+    return "${now.year}-"
+        "${now.month.toString().padLeft(2, '0')}-"
+        "${now.day.toString().padLeft(2, '0')}";
   }
 
+  // ================= DOC REF =================
+
   DocumentReference<Map<String, dynamic>> get docRef {
+    final uid = user?.uid;
+
+    if (uid == null) {
+      throw Exception("User not logged in");
+    }
+
     return firestore
         .collection('users')
-        .doc(user!.uid)
+        .doc(uid)
         .collection('daily')
         .doc(today);
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> get stream =>
-      docRef.snapshots();
+  // ================= STREAM =================
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> get stream {
+    return docRef
+        .snapshots()
+        .cast<DocumentSnapshot<Map<String, dynamic>>>();
+  }
 
   // ================= SAVE =================
+
   Future<void> saveData() async {
-    if (user == null) return;
+    final uid = user?.uid;
+
+    if (uid == null) return;
 
     try {
       await docRef.set({
@@ -59,11 +83,16 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
   }
 
   // ================= AUTO SAVE =================
+
   void autoSave() {
     debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 700), () {
-      saveData();
-    });
+
+    debounce = Timer(
+      const Duration(milliseconds: 600),
+      () {
+        saveData();
+      },
+    );
   }
 
   @override
@@ -75,178 +104,383 @@ class _HydrationNutritionScreenState extends State<HydrationNutritionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const Color brandBlue = Color(0xFF1E40AF);
-    const Color softBg = Color(0xFFF8FAFC);
-
     return Scaffold(
       backgroundColor: softBg,
+
       drawer: const AppDrawer(),
+
+      // ✅ BOTTOM NAVIGATION
+      bottomNavigationBar:
+          const MainNavigation(currentIndex: 1),
 
       appBar: AppBar(
         backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: brandBlue),
-        title: const Text("Health Tracker"),
+        elevation: 0,
+
+        iconTheme: const IconThemeData(
+          color: brandBlue,
+        ),
+
+        title: const Text(
+          "Health Tracker",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
       ),
 
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: stream,
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final data = snapshot.data!.data()!;
+      body: user == null
+          ? const Center(
+              child: Text("User not logged in"),
+            )
+          : StreamBuilder<
+              DocumentSnapshot<Map<String, dynamic>>>(
+              stream: stream,
 
-            final firebaseWater =
-                (data['hydration'] ?? 0).toDouble();
+              builder: (context, snapshot) {
+                if (snapshot.hasData &&
+                    snapshot.data!.exists) {
+                  final data = snapshot.data!.data()!;
 
-            meals = List<String>.from(data['meals'] ?? []);
+                  final firebaseWater =
+                      (data['hydration'] ?? 0)
+                          .toDouble();
 
-            // only sync when user is NOT sliding
-            if (!isSliding) {
-              localWater = firebaseWater.clamp(0, 5);
-            }
-          }
+                  final firebaseMeals =
+                      List<String>.from(
+                    data['meals'] ?? [],
+                  );
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                  if (!isSliding) {
+                    localWater =
+                        firebaseWater.clamp(0, 5);
+                  }
 
-                const Text(
-                  "Daily Health Tracking",
-                  style: TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
-                ),
+                  meals = firebaseMeals;
+                }
 
-                const SizedBox(height: 25),
-
-                // ================= HYDRATION =================
-                Container(
+                return SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
+
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+
                     children: [
+                      // ================= HEADER =================
 
-                      const Text(
-                        "Hydration 💧",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                      ),
+                      Container(
+                        padding:
+                            const EdgeInsets.all(24),
 
-                      const SizedBox(height: 10),
+                        decoration: BoxDecoration(
+                          gradient:
+                              const LinearGradient(
+                            colors: [
+                              Color(0xFF1E40AF),
+                              Color(0xFF3B82F6),
+                            ],
+                          ),
 
-                      Text(
-                        "${localWater.toStringAsFixed(1)} L",
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          borderRadius:
+                              BorderRadius.circular(
+                                  24),
+                        ),
+
+                        child: const Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+
+                          children: [
+                            Text(
+                              "Daily Health Tracking",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
+                            ),
+
+                            SizedBox(height: 8),
+
+                            Text(
+                              "Monitor hydration and nutrition daily.",
+                              style: TextStyle(
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
-                      Slider(
-                        value: localWater.clamp(0, 5),
-                        min: 0,
-                        max: 5,
-                        divisions: 10,
-                        activeColor: brandBlue,
+                      const SizedBox(height: 25),
 
-                        onChangeStart: (_) {
-                          setState(() => isSliding = true);
-                        },
+                      // ================= HYDRATION =================
 
-                        onChanged: (value) {
-                          setState(() => localWater = value);
-                          autoSave();
-                        },
+                      Container(
+                        padding:
+                            const EdgeInsets.all(20),
 
-                        onChangeEnd: (_) {
-                          setState(() => isSliding = false);
-                          saveData();
-                        },
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+
+                          borderRadius:
+                              BorderRadius.circular(
+                                  22),
+
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black
+                                  .withValues(
+                                      alpha: 0.04),
+                              blurRadius: 10,
+                              offset:
+                                  const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.water_drop,
+                                  color: Colors.blue,
+                                ),
+
+                                SizedBox(width: 8),
+
+                                Text(
+                                  "Hydration",
+                                  style: TextStyle(
+                                    fontWeight:
+                                        FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            Text(
+                              "${localWater.toStringAsFixed(1)} L",
+
+                              style: const TextStyle(
+                                fontSize: 34,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
+                            ),
+
+                            Slider(
+                              value: localWater,
+
+                              min: 0,
+                              max: 5,
+                              divisions: 10,
+
+                              activeColor:
+                                  brandBlue,
+
+                              onChangeStart: (_) {
+                                setState(() {
+                                  isSliding = true;
+                                });
+                              },
+
+                              onChanged: (value) {
+                                setState(() {
+                                  localWater = value;
+                                });
+
+                                autoSave();
+                              },
+
+                              onChangeEnd: (_) {
+                                setState(() {
+                                  isSliding = false;
+                                });
+
+                                saveData();
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
 
-                const SizedBox(height: 25),
+                      const SizedBox(height: 28),
 
-                // ================= MEALS =================
-                const Text(
-                  "Meals",
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                      // ================= MEALS =================
 
-                const SizedBox(height: 10),
+                      const Text(
+                        "Meals",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: mealController,
-                        decoration: InputDecoration(
-                          hintText: "Add meal",
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller:
+                                  mealController,
+
+                              decoration:
+                                  InputDecoration(
+                                hintText:
+                                    "Add meal",
+
+                                filled: true,
+                                fillColor:
+                                    Colors.white,
+
+                                border:
+                                    OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                              16),
+
+                                  borderSide:
+                                      BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          ElevatedButton(
+                            style:
+                                ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  brandBlue,
+
+                              padding:
+                                  const EdgeInsets
+                                      .all(16),
+
+                              shape:
+                                  RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                            16),
+                              ),
+                            ),
+
+                            onPressed: () {
+                              final meal =
+                                  mealController.text
+                                      .trim();
+
+                              if (meal.isEmpty) {
+                                return;
+                              }
+
+                              setState(() {
+                                meals.add(meal);
+
+                                mealController
+                                    .clear();
+                              });
+
+                              saveData();
+                            },
+
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+
+                        children: meals.map((meal) {
+                          return Chip(
+                            label: Text(meal),
+
+                            backgroundColor:
+                                Colors.white,
+
+                            deleteIconColor:
+                                Colors.red,
+
+                            onDeleted: () {
+                              setState(() {
+                                meals.remove(meal);
+                              });
+
+                              saveData();
+                            },
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 35),
+
+                      // ================= SAVE BUTTON =================
+
+                      SizedBox(
+                        width: double.infinity,
+
+                        child: ElevatedButton(
+                          style:
+                              ElevatedButton.styleFrom(
+                            backgroundColor:
+                                brandBlue,
+
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              vertical: 16,
+                            ),
+
+                            shape:
+                                RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(18),
+                            ),
+                          ),
+
+                          onPressed: saveData,
+
+                          child: const Text(
+                            "Save Data",
+
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(width: 10),
-
-                    ElevatedButton(
-                      onPressed: () {
-                        if (mealController.text.trim().isEmpty) return;
-
-                        setState(() {
-                          meals.add(mealController.text.trim());
-                          mealController.clear();
-                        });
-
-                        saveData();
-                      },
-                      child: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 15),
-
-                Wrap(
-                  spacing: 10,
-                  children: meals.map((meal) {
-                    return Chip(
-                      label: Text(meal),
-                      onDeleted: () {
-                        setState(() => meals.remove(meal));
-                        saveData();
-                      },
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 30),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: saveData,
-                    child: const Text("Save Data"),
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

@@ -1,43 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'auth_wrapper.dart';
+import 'firebase_options.dart';
+
+import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
-
-  // RENABLE OFFLINE PERSISTENCE
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // dotenv safe load
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint("⚠️ .env not found");
-  }
-
-  runApp(const MyApp());
+  runApp(const SickleCareApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SickleCareApp extends StatelessWidget {
+  const SickleCareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SickleCare',
       debugShowCheckedModeBanner: false,
+      title: 'SickleCare',
+
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF4F7FA),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+        ),
       ),
-      home: const AuthWrapper(),
+
+      home: const HomeScreen(),
     );
   }
 }

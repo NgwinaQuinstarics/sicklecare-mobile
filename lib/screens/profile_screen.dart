@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../widgets/app_drawer.dart';
+import '../widgets/main_navigation.dart'; // ✅ ADD THIS
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,8 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool notifications = true;
   bool isLoading = true;
 
-  // Professional Aesthetic Palette
-  static const Color primaryBlue = Color(0xFF1E40AF); 
+  static const Color primaryBlue = Color(0xFF1E40AF);
   static const Color accentBlue = Color(0xFF3B82F6);
   static const Color surfaceWhite = Colors.white;
   static const Color bgGrey = Color(0xFFF8FAFC);
@@ -62,7 +63,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: primaryBlue)),
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: primaryBlue)),
     );
 
     try {
@@ -76,13 +78,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }, SetOptions(merge: true));
 
       if (!mounted) return;
-      Navigator.pop(context); 
-      
+      Navigator.pop(context);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Profile securely synchronized"),
           backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
@@ -98,6 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: bgGrey,
       drawer: const AppDrawer(),
+
+      // ✅ BOTTOM NAVIGATION ADDED HERE
+      bottomNavigationBar: const MainNavigation(currentIndex: 4),
+
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryBlue))
           : CustomScrollView(
@@ -111,20 +116,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         _buildSectionHeader("IDENTITY & CONTACT"),
                         _buildProfileCard([
-                          _buildModernInput(nameController, "Legal Full Name", Icons.badge_outlined),
-                          _buildModernInput(ageController, "Current Age", Icons.calendar_today_outlined, type: TextInputType.number),
-                          _buildModernInput(contactController, "Emergency Contact", Icons.contact_emergency_outlined, type: TextInputType.phone),
+                          _buildModernInput(
+                              nameController, "Full Name", Icons.badge_outlined),
+                          _buildModernInput(ageController, "Age",
+                              Icons.calendar_today_outlined,
+                              type: TextInputType.number),
+                          _buildModernInput(
+                              contactController,
+                              "Emergency Contact",
+                              Icons.contact_emergency_outlined,
+                              type: TextInputType.phone),
                         ]),
-                        
+
                         const SizedBox(height: 24),
-                        
+
                         _buildSectionHeader("CLINICAL DATA"),
                         _buildProfileCard([
                           DropdownButtonFormField<String>(
-                            initialValue: genotype, // FIXED: initialValue used here
-                            decoration: _inputDecoration("Blood Genotype", Icons.bloodtype_outlined),
+                            value: genotype,
+                            decoration: _inputDecoration(
+                                "Blood Genotype", Icons.bloodtype_outlined),
                             items: ["AA", "AS", "SS"]
-                                .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                                .map((g) => DropdownMenuItem(
+                                    value: g, child: Text(g)))
                                 .toList(),
                             onChanged: (v) => setState(() => genotype = v!),
                           ),
@@ -136,11 +150,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildProfileCard([
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text("Health Notifications", style: TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: const Text("Receive automated hydration and medication alerts"),
+                            title: const Text("Health Notifications",
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: const Text(
+                                "Receive alerts for hydration & medication"),
                             value: notifications,
-                            activeThumbColor: accentBlue, // FIXED: activeThumbColor used here
-                            onChanged: (v) => setState(() => notifications = v),
+                            activeColor: accentBlue,
+                            onChanged: (v) =>
+                                setState(() => notifications = v),
                           ),
                         ]),
 
@@ -154,12 +171,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryBlue,
                               foregroundColor: Colors.white,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
                             ),
-                            child: const Text("COMMIT CHANGES", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                            child: const Text("SAVE PROFILE"),
                           ),
                         ),
+
                         const SizedBox(height: 50),
                       ],
                     ),
@@ -172,26 +190,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSliverHeader() {
     return SliverAppBar(
-      expandedHeight: 200.0,
+      expandedHeight: 200,
       pinned: true,
-      elevation: 0,
       backgroundColor: primaryBlue,
       flexibleSpace: FlexibleSpaceBar(
+        title: const Text("PROFILE"),
         centerTitle: true,
-        title: const Text("PROFILE", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 3)),
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [primaryBlue, accentBlue],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
             ),
           ),
-          child: Center(
+          child: const Center(
             child: CircleAvatar(
               radius: 40,
-              backgroundColor: Colors.white.withAlpha(40),
-              child: const Icon(Icons.person_outline_rounded, size: 45, color: Colors.white),
+              child: Icon(Icons.person, size: 40),
             ),
           ),
         ),
@@ -201,8 +215,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.blueGrey, letterSpacing: 1.2)),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(title,
+          style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -211,8 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: surfaceWhite,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 20, offset: const Offset(0, 8))],
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(children: children),
     );
@@ -221,22 +235,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: primaryBlue, size: 20),
-      labelStyle: const TextStyle(color: Colors.blueGrey, fontSize: 13, fontWeight: FontWeight.w500),
+      prefixIcon: Icon(icon),
       filled: true,
       fillColor: bgGrey,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
-  Widget _buildModernInput(TextEditingController c, String label, IconData icon, {TextInputType type = TextInputType.text}) {
+  Widget _buildModernInput(
+      TextEditingController c, String label, IconData icon,
+      {TextInputType type = TextInputType.text}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: c,
         keyboardType: type,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         decoration: _inputDecoration(label, icon),
       ),
     );
