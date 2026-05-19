@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../widgets/app_drawer.dart';
 import '../widgets/main_navigation.dart';
@@ -55,8 +56,7 @@ const _kGreen      = Color(0xFF00C853);
 const _kCardBg     = Color(0xFFFFFFFF);
 
 // ─── API ─────────────────────────────────────────────────────────────────────
-
-const _kGroqKey = ''; // 🔑 console.groq.com → FREE
+final String _kGroqKey = dotenv.env['GROQ_API_KEY'] ?? '';// 🔑 console.groq.com → FREE
 
 const _kSystemPrompt =
     'You are Sika, a warm and compassionate AI support companion for SickleCare Cameroon — '

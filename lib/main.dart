@@ -8,13 +8,23 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load .env file
-  await dotenv.load(fileName: ".env");
+  try {
+    // Load environment variables
+    await dotenv.load(fileName: ".env");
+    debugPrint(".env loaded successfully");
+  } catch (e) {
+    debugPrint("Failed to load .env: $e");
+  }
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint(" Firebase initialized");
+  } catch (e) {
+    debugPrint(" Firebase init error: $e");
+  }
 
   runApp(const SickleCareApp());
 }
@@ -27,6 +37,7 @@ class SickleCareApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SickleCare',
+
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF4F7FA),
@@ -34,6 +45,7 @@ class SickleCareApp extends StatelessWidget {
           seedColor: const Color(0xFF1565C0),
         ),
       ),
+
       home: const SplashScreen(),
     );
   }
