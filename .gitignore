@@ -1,10 +1,6 @@
 # ------------------------------
-# OS & Misc
+# OS
 # ------------------------------
-*.class
-*.log
-*.pyc
-*.swp
 .DS_Store
 
 # ------------------------------
@@ -13,30 +9,20 @@
 .idea/
 .vscode/
 *.iml
-*.ipr
-*.iws
 
 # ------------------------------
 # Flutter / Dart
 # ------------------------------
 .dart_tool/
 .packages
-.pub/
 .pub-cache/
 build/
-coverage/
-firestore_service/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
 
 # ------------------------------
-# Android / iOS build files
-# ------------------------------
-android/app/debug
-android/app/profile
-android/app/release
-ios/Flutter/.last_build_id
-
-# ------------------------------
-# Firebase (IMPORTANT)
+# Firebase
 # ------------------------------
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
@@ -45,19 +31,16 @@ ios/Runner/GoogleService-Info.plist
 # Environment / secrets
 # ------------------------------
 .env
-
-.agents/
-.claude/
-skills-lock.json
-
 .env.*
-# ------------------------------
-# flutter dependencies / secrets
-# ------------------------------
-
-.flutter-plugins-dependencies
 
 # ------------------------------
-# Optional (keep tracked!)
+# Android / iOS generated
 # ------------------------------
-# lib/firebase_options.dart   
+android/.gradle/
+ios/Pods/
+ios/.symlinks/
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log

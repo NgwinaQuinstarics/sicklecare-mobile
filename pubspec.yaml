@@ -1,5 +1,6 @@
 name: sicklecare_app
 description: "SickleCare - Sickle Cell Health Management App"
+
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -11,60 +12,64 @@ dependencies:
   flutter:
     sdk: flutter
 
-  #  UI & Design
+  # Support Screen
+  speech_to_text: ^7.3.0
+  flutter_tts: ^3.5.2
+  image_picker: ^1.1.2
+
+  # UI & Design
   cupertino_icons: ^1.0.8
   google_fonts: ^6.3.3
   font_awesome_flutter: ^11.0.0
-
-  #  for sharing 
-
-  printing: ^5.12.0
-  pdf: ^3.10.8
   animate_do: ^3.0.0
 
-  #  Charts & Data
+  # Charts & Data
   fl_chart: ^0.68.0
   intl: ^0.19.0
+
+  # File & Sharing
   path_provider: ^2.1.2
   share_plus: ^7.2.1
+  printing: ^5.12.0
+  pdf: ^3.10.8
 
-  #  Firebase
+  # Firebase
   firebase_core: ^2.27.0
   firebase_auth: ^4.8.1
   cloud_firestore: ^4.17.5
+  cloud_functions: ^4.7.6
 
-  #  API & Location
+  # API & Location
   http: ^1.2.0
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
 
-  #  State Management
+  # State Management
   provider: ^6.1.5
 
-  #  Local Storage
+  # Local Storage
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^9.2.2
 
-  #  Notifications
+  # Notifications
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.2
 
-  #  ENV (API keys)
-  flutter_dotenv: ^6.0.0
+  # ENV
+  flutter_dotenv: ^6.0.1
 
-  #  Debugging
+  # Debugging
   logger: ^1.2.2
-  cloud_functions: ^4.7.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^6.0.0
 
-  #  App icon generator
+  # App Icon Generator
   flutter_launcher_icons: ^0.13.1
 
-#  App Icon Config
 flutter_launcher_icons:
   android: true
   ios: true
@@ -73,7 +78,6 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  #  ASSETS (VERY IMPORTANT FOR DOTENV)
   assets:
     - .env
     - assets/
