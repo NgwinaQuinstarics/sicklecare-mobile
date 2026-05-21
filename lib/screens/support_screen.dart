@@ -8,9 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import '../widgets/app_drawer.dart';
-import '../widgets/main_navigation.dart';
-
 // ─── MODELS ──────────────────────────────────────────────────────────────────
 
 enum MessageRole { user, assistant }
@@ -54,7 +51,6 @@ const _kShadowSm   = Color(0x10000000);
 const _kShadowMd   = Color(0x16000000);
 const _kGreen      = Color(0xFF00C853);
 const _kCardBg     = Color(0xFFFFFFFF);
-// 10% red for image button background — avoids withOpacity deprecation
 const _kRedTint10  = Color(0x1AE53935);
 
 // ─── API ─────────────────────────────────────────────────────────────────────
@@ -94,10 +90,9 @@ class SupportScreen extends StatefulWidget {
 
 class _SupportScreenState extends State<SupportScreen>
     with TickerProviderStateMixin {
-  final _textCtrl    = TextEditingController();
-  final _scrollCtrl  = ScrollController();
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _messages    = <ChatMessage>[];
+  final _textCtrl   = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  final _messages   = <ChatMessage>[];
 
   bool   _loading      = false;
   bool   _showChips    = true;
@@ -415,11 +410,9 @@ class _SupportScreenState extends State<SupportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: _kBg,
-      drawer: const AppDrawer(),
       appBar: _buildAppBar(),
-      bottomNavigationBar: MainNavigation(currentIndex: 0),
+      // ── No drawer, no bottomNavigationBar ──
       body: SafeArea(
         child: Column(
           children: [
@@ -435,15 +428,17 @@ class _SupportScreenState extends State<SupportScreen>
     );
   }
 
-  // ── AppBar ─────────────────────────────────────────────────────────────────
+  // ── AppBar — back arrow only ───────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar() => AppBar(
         backgroundColor: _kBlue,
         elevation: 0,
         titleSpacing: 0,
+        // Back arrow → pops back to wherever we came from (HomeScreen)
         leading: IconButton(
-          icon: const Icon(Icons.menu_rounded, color: _kWhite, size: 24),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: _kWhite, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
@@ -1014,7 +1009,7 @@ class _SupportScreenState extends State<SupportScreen>
         ),
         child: Row(
           children: [
-            // ── Mic ────────────────────────────────────────────────────────
+            // Mic
             GestureDetector(
               onTap: _speechAvailable ? _toggleVoice : null,
               child: AnimatedContainer(
@@ -1042,7 +1037,7 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 8),
 
-            // ── Image ──────────────────────────────────────────────────────
+            // Image
             GestureDetector(
               onTap: _showImageSourceSheet,
               child: AnimatedContainer(
@@ -1050,7 +1045,6 @@ class _SupportScreenState extends State<SupportScreen>
                 width: 46, height: 46,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  // const colour — no withOpacity needed
                   color: _pendingImagePath != null ? _kRedTint10 : _kBg,
                   border: Border.all(
                     color: _pendingImagePath != null
@@ -1069,7 +1063,7 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 8),
 
-            // ── Text field ─────────────────────────────────────────────────
+            // Text field
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -1105,7 +1099,7 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 8),
 
-            // ── Send ───────────────────────────────────────────────────────
+            // Send
             GestureDetector(
               onTap: () => _send(_textCtrl.text),
               child: Container(
