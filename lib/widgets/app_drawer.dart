@@ -4,6 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/support_screen.dart';
 import '../screens/weather_screen.dart';
 import '../screens/profile_screen.dart';
+
+import '../screens/settings/privacy_policy_screen.dart';
+import '../screens/settings/terms_screen.dart';
+import '../screens/settings/feedback_screen.dart';
+import '../screens/settings/about_screen.dart';
+
 import '../login.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -27,6 +33,7 @@ class AppDrawer extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
+
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -42,7 +49,7 @@ class AppDrawer extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  /// ================= LOGO =================
+                  /// LOGO
                   Container(
                     width: 80,
                     height: 80,
@@ -56,6 +63,17 @@ class AppDrawer extends StatelessWidget {
                     child: Image.asset(
                       "assets/logo.png",
                       fit: BoxFit.contain,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    "SickleCare",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
 
@@ -78,6 +96,7 @@ class AppDrawer extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 children: [
 
+                  /// ================= TOOLS =================
                   _sectionTitle("TOOLS"),
 
                   /// WEATHER
@@ -95,26 +114,75 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.support_agent,
                     title: "Support Center",
-                    subtitle: "Community & help resources",
+                    subtitle: "Community & emergency help",
                     color: Colors.teal,
                     page: const SupportScreen(),
                   ),
 
                   const SizedBox(height: 20),
 
+                  /// ================= ACCOUNT =================
                   _sectionTitle("ACCOUNT"),
 
                   /// PROFILE
                   _drawerTile(
                     context,
-                    icon: Icons.person,
+                    icon: Icons.person_outline,
                     title: "Profile",
-                    subtitle: "Manage your personal health data",
+                    subtitle: "Manage personal health data",
                     color: Colors.indigo,
                     page: const ProfileScreen(),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 20),
+
+                  /// ================= LEGAL & SUPPORT =================
+                  _sectionTitle("LEGAL & SUPPORT"),
+
+                  /// FEEDBACK
+                  _drawerTile(
+                    context,
+                    icon: Icons.feedback_outlined,
+                    title: "Send Feedback",
+                    subtitle: "Help us improve the app",
+                    color: Colors.orange,
+                    page: const FeedbackScreen(),
+                  ),
+
+                  /// PRIVACY POLICY
+                  _drawerTile(
+                    context,
+                    icon: Icons.privacy_tip_outlined,
+                    title: "Privacy Policy",
+                    subtitle: "How your data is protected",
+                    color: Colors.green,
+                    page: const PrivacyPolicyScreen(),
+                  ),
+
+                  /// TERMS & CONDITIONS
+                  _drawerTile(
+                    context,
+                    icon: Icons.description_outlined,
+                    title: "Terms & Conditions",
+                    subtitle: "Read app usage policies",
+                    color: Colors.deepPurple,
+                    page: const TermsScreen(),
+                  ),
+
+                  /// ABOUT APP
+                  _drawerTile(
+                    context,
+                    icon: Icons.info_outline,
+                    title: "About App",
+                    subtitle: "App information & developer",
+                    color: Colors.cyan,
+                    page: const AboutScreen(),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  /// ================= ACCOUNT ACTIONS =================
+                  _sectionTitle("ACCOUNT ACTIONS"),
 
                   /// LOGOUT
                   _actionTile(
@@ -123,6 +191,7 @@ class AppDrawer extends StatelessWidget {
                     title: "Sign Out",
                     color: primaryBlue,
                     onTap: () async {
+
                       await FirebaseAuth.instance.signOut();
 
                       if (!context.mounted) return;
@@ -160,10 +229,11 @@ class AppDrawer extends StatelessWidget {
                   SizedBox(height: 10),
 
                   Text(
-                    "SickleCare v1.0",
+                    "SickleCare v1.0.0",
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
 
@@ -174,6 +244,17 @@ class AppDrawer extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: 11,
+                    ),
+                  ),
+
+                  SizedBox(height: 8),
+
+                  Text(
+                    "Developed for sickle cell support & awareness",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 10,
                     ),
                   ),
                 ],
@@ -193,8 +274,10 @@ class AppDrawer extends StatelessWidget {
         bottom: 12,
         top: 10,
       ),
+
       child: Text(
         title,
+
         style: const TextStyle(
           color: Colors.grey,
           fontSize: 12,
@@ -230,7 +313,7 @@ class AppDrawer extends StatelessWidget {
         ),
 
         leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha:0.12),
+          backgroundColor: color.withValues(alpha: 0.12),
           child: Icon(icon, color: color),
         ),
 
@@ -249,11 +332,14 @@ class AppDrawer extends StatelessWidget {
         ),
 
         onTap: () {
+
           Navigator.pop(context);
 
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => page),
+            MaterialPageRoute(
+              builder: (_) => page,
+            ),
           );
         },
       ),
@@ -284,7 +370,7 @@ class AppDrawer extends StatelessWidget {
         ),
 
         leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha:0.12),
+          backgroundColor: color.withValues(alpha: 0.12),
           child: Icon(icon, color: color),
         ),
 
@@ -306,8 +392,9 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  /// ================= DELETE DIALOG =================
+  /// ================= DELETE ACCOUNT DIALOG =================
   void _showDeleteDialog(BuildContext context) {
+
     showDialog(
       context: context,
 
@@ -335,7 +422,9 @@ class AppDrawer extends StatelessWidget {
             ),
 
             onPressed: () async {
+
               try {
+
                 await FirebaseAuth.instance.currentUser?.delete();
 
                 if (!context.mounted) return;
@@ -347,6 +436,7 @@ class AppDrawer extends StatelessWidget {
                   ),
                   (route) => false,
                 );
+
               } catch (e) {
 
                 Navigator.pop(context);

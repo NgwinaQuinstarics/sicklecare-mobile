@@ -20,7 +20,7 @@ class ChatMessage {
   final MessageRole role;
   final DateTime time;
   final bool isVoice;
-  final String? imagePath; // local file path for image bubbles
+  final String? imagePath;
   ChatMessage({
     required this.text,
     required this.role,
@@ -54,9 +54,12 @@ const _kShadowSm   = Color(0x10000000);
 const _kShadowMd   = Color(0x16000000);
 const _kGreen      = Color(0xFF00C853);
 const _kCardBg     = Color(0xFFFFFFFF);
+// 10% red for image button background — avoids withOpacity deprecation
+const _kRedTint10  = Color(0x1AE53935);
 
 // ─── API ─────────────────────────────────────────────────────────────────────
-final String _kGroqKey = dotenv.env['GROQ_API_KEY'] ?? '';// 🔑 console.groq.com → FREE
+
+String get _kGroqKey => dotenv.env['GROQ_API_KEY'] ?? '';
 
 const _kSystemPrompt =
     'You are Sika, a warm and compassionate AI support companion for SickleCare Cameroon — '
@@ -96,23 +99,19 @@ class _SupportScreenState extends State<SupportScreen>
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _messages    = <ChatMessage>[];
 
-  bool _loading     = false;
-  bool _showChips   = true;
-  bool _isListening = false;
-  String _voiceDraft = '';
+  bool   _loading      = false;
+  bool   _showChips    = true;
+  bool   _isListening  = false;
+  String _voiceDraft   = '';
 
-  // Pending image (chosen but not yet sent)
   String? _pendingImagePath;
   String? _pendingImageB64;
 
-  // Speech
   final _speech = stt.SpeechToText();
-  bool _speechAvailable = false;
+  bool  _speechAvailable = false;
 
-  // Image picker
   final _picker = ImagePicker();
 
-  // Animations
   late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulseAnim;
   late final AnimationController _micCtrl;
@@ -164,13 +163,14 @@ class _SupportScreenState extends State<SupportScreen>
 
   // ── Voice ──────────────────────────────────────────────────────────────────
 
-  void _toggleVoice() async {
+  Future<void> _toggleVoice() async {
     if (_isListening) {
       await _speech.stop();
       setState(() => _isListening = false);
       if (_voiceDraft.trim().isNotEmpty) {
-        _send(_voiceDraft.trim(), isVoice: true);
+        final text = _voiceDraft.trim();
         _voiceDraft = '';
+        _send(text, isVoice: true);
       }
     } else {
       if (!_speechAvailable) return;
@@ -181,8 +181,10 @@ class _SupportScreenState extends State<SupportScreen>
       await _speech.listen(
         onResult: (r) => setState(() => _voiceDraft = r.recognizedWords),
         localeId: 'en_US',
-        cancelOnError: true,
-        partialResults: true,
+        listenOptions: stt.SpeechListenOptions(
+          cancelOnError: true,
+          partialResults: true,
+        ),
       );
     }
   }
@@ -274,7 +276,7 @@ class _SupportScreenState extends State<SupportScreen>
       );
 
   Future<void> _pickImage(ImageSource source) async {
-    Navigator.pop(context); // close sheet first
+    Navigator.pop(context);
     final picked = await _picker.pickImage(
       source: source,
       imageQuality: 75,
@@ -316,13 +318,11 @@ class _SupportScreenState extends State<SupportScreen>
     _scrollToBottom();
 
     try {
-      // Use vision model when image is present
       final useVision = imgB64Snap != null;
       final model = useVision
           ? 'meta-llama/llama-4-scout-17b-16e-instruct'
           : 'llama-3.3-70b-versatile';
 
-      // Build user content (multimodal if vision)
       dynamic userContent;
       if (useVision) {
         userContent = [
@@ -341,7 +341,6 @@ class _SupportScreenState extends State<SupportScreen>
         userContent = trimmed;
       }
 
-      // History: last 10 text-only messages for context
       final start =
           (_messages.length - 1 - 10).clamp(0, _messages.length - 1);
       final history = <Map<String, dynamic>>[];
@@ -550,8 +549,7 @@ class _SupportScreenState extends State<SupportScreen>
                     'assets/logo.png',
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Center(
-                        child:
-                            Text('🩸', style: TextStyle(fontSize: 20))),
+                        child: Text('🩸', style: TextStyle(fontSize: 20))),
                   ),
                 ),
               ),
@@ -630,8 +628,7 @@ class _SupportScreenState extends State<SupportScreen>
                       'assets/logo.png',
                       fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Center(
-                          child: Text('🩸',
-                              style: TextStyle(fontSize: 15))),
+                          child: Text('🩸', style: TextStyle(fontSize: 15))),
                     ),
                   ),
                 ),
@@ -672,7 +669,6 @@ class _SupportScreenState extends State<SupportScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Sika label
                       if (!isUser)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
@@ -682,8 +678,7 @@ class _SupportScreenState extends State<SupportScreen>
                               Container(
                                 width: 6, height: 6,
                                 decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _kRed),
+                                    shape: BoxShape.circle, color: _kRed),
                               ),
                               const SizedBox(width: 5),
                               Text('Sika',
@@ -695,7 +690,6 @@ class _SupportScreenState extends State<SupportScreen>
                           ),
                         ),
 
-                      // Voice badge
                       if (isUser && msg.isVoice)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 5),
@@ -707,13 +701,11 @@ class _SupportScreenState extends State<SupportScreen>
                               const SizedBox(width: 4),
                               Text('Voice message',
                                   style: GoogleFonts.dmSans(
-                                      fontSize: 10,
-                                      color: _kWhite65)),
+                                      fontSize: 10, color: _kWhite65)),
                             ],
                           ),
                         ),
 
-                      // Image thumbnail
                       if (msg.imagePath != null) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
@@ -727,7 +719,6 @@ class _SupportScreenState extends State<SupportScreen>
                         const SizedBox(height: 8),
                       ],
 
-                      // Text (hide placeholder when image only)
                       if (msg.text != '📷 Photo' || msg.imagePath == null)
                         Text(
                           msg.text,
@@ -790,9 +781,7 @@ class _SupportScreenState extends State<SupportScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                      color: _kRedGlow,
-                      blurRadius: 8,
-                      offset: Offset(0, 3))
+                      color: _kRedGlow, blurRadius: 8, offset: Offset(0, 3))
                 ],
               ),
               child: const Center(
@@ -832,8 +821,7 @@ class _SupportScreenState extends State<SupportScreen>
 
   Widget _buildVoiceOverlay() => Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFFEBEE), Color(0xFFE3F2FD)],
@@ -1021,14 +1009,12 @@ class _SupportScreenState extends State<SupportScreen>
           color: _kCardBg,
           boxShadow: [
             BoxShadow(
-                color: _kShadowMd,
-                blurRadius: 18,
-                offset: Offset(0, -4))
+                color: _kShadowMd, blurRadius: 18, offset: Offset(0, -4))
           ],
         ),
         child: Row(
           children: [
-            // ── Mic button ─────────────────────────────────────────────────
+            // ── Mic ────────────────────────────────────────────────────────
             GestureDetector(
               onTap: _speechAvailable ? _toggleVoice : null,
               child: AnimatedContainer(
@@ -1056,7 +1042,7 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 8),
 
-            // ── Image button ───────────────────────────────────────────────
+            // ── Image ──────────────────────────────────────────────────────
             GestureDetector(
               onTap: _showImageSourceSheet,
               child: AnimatedContainer(
@@ -1064,9 +1050,8 @@ class _SupportScreenState extends State<SupportScreen>
                 width: 46, height: 46,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _pendingImagePath != null
-                      ? _kRed.withValues(alpha: 0.1)
-                      : _kBg,
+                  // const colour — no withOpacity needed
+                  color: _pendingImagePath != null ? _kRedTint10 : _kBg,
                   border: Border.all(
                     color: _pendingImagePath != null
                         ? _kRedBorder
@@ -1099,8 +1084,7 @@ class _SupportScreenState extends State<SupportScreen>
                       child: TextField(
                         controller: _textCtrl,
                         maxLines: null,
-                        textCapitalization:
-                            TextCapitalization.sentences,
+                        textCapitalization: TextCapitalization.sentences,
                         style: GoogleFonts.dmSans(
                             fontSize: 14, color: _kTextDark),
                         decoration: InputDecoration(
@@ -1108,8 +1092,8 @@ class _SupportScreenState extends State<SupportScreen>
                           hintStyle: GoogleFonts.dmSans(
                               fontSize: 14, color: _kGrey),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                              vertical: 13),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 13),
                         ),
                         onSubmitted: _send,
                       ),
@@ -1121,7 +1105,7 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 8),
 
-            // ── Send button ────────────────────────────────────────────────
+            // ── Send ───────────────────────────────────────────────────────
             GestureDetector(
               onTap: () => _send(_textCtrl.text),
               child: Container(
