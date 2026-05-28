@@ -21,7 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool   notifications  = true;
   bool   isLoading      = true;
 
-  // ── Colors ─────────────────────────────────────────────────────────────────
+  // ── Colors 
   static const _blue      = Color(0xFF1E40AF);
   static const _blueMid   = Color(0xFF2563EB);
   static const _red       = Color(0xFFE53935);
@@ -47,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ── Load ───────────────────────────────────────────────────────────────────
+  // ── Load
 
   Future<void> _loadProfile() async {
     final uid = user?.uid;
@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profile saved successfully ✅'),
+          content: Text('Profile saved successfully '),
           backgroundColor: Color(0xFF2E7D32),
         ),
       );

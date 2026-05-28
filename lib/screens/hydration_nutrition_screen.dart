@@ -30,7 +30,7 @@ class _HydrationNutritionScreenState
   static const Color brandBlue = Color(0xFF1E40AF);
   static const Color softBg = Color(0xFFF8FAFC);
 
-  // ================= DATE =================
+  //  DATE 
 
   String get today {
     final now = DateTime.now();
@@ -40,7 +40,7 @@ class _HydrationNutritionScreenState
         "${now.day.toString().padLeft(2, '0')}";
   }
 
-  // ================= DOC REF =================
+  // DOC REF 
 
   DocumentReference<Map<String, dynamic>> get docRef {
     final uid = user?.uid;
@@ -56,7 +56,7 @@ class _HydrationNutritionScreenState
         .doc(today);
   }
 
-  // ================= STREAM =================
+  //  STREAM 
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> get stream {
     return docRef
@@ -64,7 +64,7 @@ class _HydrationNutritionScreenState
         .cast<DocumentSnapshot<Map<String, dynamic>>>();
   }
 
-  // ================= SAVE =================
+  //  SAVE 
 
   Future<void> saveData() async {
     final uid = user?.uid;
@@ -82,7 +82,7 @@ class _HydrationNutritionScreenState
     }
   }
 
-  // ================= AUTO SAVE =================
+  //  AUTO SAVE 
 
   void autoSave() {
     debounce?.cancel();
@@ -168,7 +168,7 @@ class _HydrationNutritionScreenState
                         CrossAxisAlignment.start,
 
                     children: [
-                      // ================= HEADER =================
+                      //  HEADER 
 
                       Container(
                         padding:
@@ -217,7 +217,7 @@ class _HydrationNutritionScreenState
 
                       const SizedBox(height: 25),
 
-                      // ================= HYDRATION =================
+                      //  HYDRATION 
 
                       Container(
                         padding:
@@ -317,7 +317,7 @@ class _HydrationNutritionScreenState
 
                       const SizedBox(height: 28),
 
-                      // ================= MEALS =================
+                      // MEALS
 
                       const Text(
                         "Meals",
@@ -436,7 +436,7 @@ class _HydrationNutritionScreenState
 
                       const SizedBox(height: 35),
 
-                      // ================= SAVE BUTTON =================
+                      //  SAVE BUTTON
 
                       SizedBox(
                         width: double.infinity,

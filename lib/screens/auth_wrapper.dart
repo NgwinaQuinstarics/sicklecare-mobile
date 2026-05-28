@@ -15,21 +15,21 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
 
-        // ⏳ Loading
+        // Loading
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // ❌ Not logged in
+        //  Not logged in
         if (!snapshot.hasData) {
           return const LoginScreen();
         }
 
         final user = snapshot.data!;
 
-        // 🔐 Check if admin
+        //  Check if admin
         return FutureBuilder(
           future: FirebaseFirestore.instance
               .collection('admins')

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/support_screen.dart';
 import '../screens/weather_screen.dart';
@@ -12,19 +13,71 @@ import '../screens/settings/about_screen.dart';
 
 import '../login.dart';
 
-class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+class AppDrawer extends StatefulWidget {
+  final Function(bool)? onThemeChanged;
+
+  const AppDrawer({
+    super.key,
+    this.onThemeChanged,
+  });
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  bool isDarkMode = false;
 
   static const Color primaryBlue = Color(0xFF1E40AF);
-  static const Color background = Color(0xFFF8FAFC);
   static const Color danger = Color(0xFFDC2626);
+
+  @override
+  void initState() {
+    super.initState();
+    loadTheme();
+  }
+
+  /// ================= LOAD THEME =================
+  Future<void> loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      isDarkMode = prefs.getBool('darkMode') ?? false;
+    });
+  }
+
+  /// ================= SAVE THEME =================
+  Future<void> toggleTheme(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setBool('darkMode', value);
+
+    setState(() {
+      isDarkMode = value;
+    });
+
+    widget.onThemeChanged?.call(value);
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    final background =
+        isDarkMode ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+
+    final cardColor =
+        isDarkMode ? const Color(0xFF1E293B) : Colors.white;
+
+    final textColor =
+        isDarkMode ? Colors.white : Colors.black87;
+
+    final subtitleColor =
+        isDarkMode ? Colors.white70 : Colors.black54;
+
     return Drawer(
       backgroundColor: background,
+
       child: SafeArea(
         child: Column(
           children: [
@@ -96,12 +149,71 @@ class AppDrawer extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 children: [
 
+                  /// ================= APPEARANCE =================
+                  _sectionTitle(
+                    "APPEARANCE",
+                    isDarkMode,
+                  ),
+
+                  Card(
+                    elevation: 0,
+                    color: cardColor,
+                    margin: const EdgeInsets.only(bottom: 12),
+
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+
+                    child: SwitchListTile(
+                      value: isDarkMode,
+
+                      onChanged: toggleTheme,
+
+                      secondary: CircleAvatar(
+                        backgroundColor:
+                            Colors.deepPurple.withValues(alpha: 0.12),
+
+                        child: Icon(
+                          isDarkMode
+                              ? Icons.dark_mode
+                              : Icons.light_mode,
+                          color: Colors.deepPurple,
+                        ),
+                      ),
+
+                      title: Text(
+                        "Dark Mode",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+
+                      subtitle: Text(
+                        "Persistent theme mode",
+                        style: TextStyle(
+                          color: subtitleColor,
+                        ),
+                      ),
+
+                      activeThumbColor: primaryBlue,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
                   /// ================= TOOLS =================
-                  _sectionTitle("TOOLS"),
+                  _sectionTitle(
+                    "TOOLS",
+                    isDarkMode,
+                  ),
 
                   /// WEATHER
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.cloud_outlined,
                     title: "Weather Forecast",
                     subtitle: "Monitor climate conditions",
@@ -112,6 +224,9 @@ class AppDrawer extends StatelessWidget {
                   /// SUPPORT
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.support_agent,
                     title: "Support Center",
                     subtitle: "Community & emergency help",
@@ -122,11 +237,17 @@ class AppDrawer extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   /// ================= ACCOUNT =================
-                  _sectionTitle("ACCOUNT"),
+                  _sectionTitle(
+                    "ACCOUNT",
+                    isDarkMode,
+                  ),
 
                   /// PROFILE
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.person_outline,
                     title: "Profile",
                     subtitle: "Manage personal health data",
@@ -136,12 +257,18 @@ class AppDrawer extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  /// ================= LEGAL & SUPPORT =================
-                  _sectionTitle("LEGAL & SUPPORT"),
+                  /// ================= LEGAL =================
+                  _sectionTitle(
+                    "LEGAL & SUPPORT",
+                    isDarkMode,
+                  ),
 
                   /// FEEDBACK
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.feedback_outlined,
                     title: "Send Feedback",
                     subtitle: "Help us improve the app",
@@ -152,6 +279,9 @@ class AppDrawer extends StatelessWidget {
                   /// PRIVACY POLICY
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.privacy_tip_outlined,
                     title: "Privacy Policy",
                     subtitle: "How your data is protected",
@@ -159,9 +289,12 @@ class AppDrawer extends StatelessWidget {
                     page: const PrivacyPolicyScreen(),
                   ),
 
-                  /// TERMS & CONDITIONS
+                  /// TERMS
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.description_outlined,
                     title: "Terms & Conditions",
                     subtitle: "Read app usage policies",
@@ -169,9 +302,12 @@ class AppDrawer extends StatelessWidget {
                     page: const TermsScreen(),
                   ),
 
-                  /// ABOUT APP
+                  /// ABOUT
                   _drawerTile(
                     context,
+                    cardColor: cardColor,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
                     icon: Icons.info_outline,
                     title: "About App",
                     subtitle: "App information & developer",
@@ -182,16 +318,19 @@ class AppDrawer extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   /// ================= ACCOUNT ACTIONS =================
-                  _sectionTitle("ACCOUNT ACTIONS"),
+                  _sectionTitle(
+                    "ACCOUNT ACTIONS",
+                    isDarkMode,
+                  ),
 
                   /// LOGOUT
                   _actionTile(
                     context,
+                    cardColor: cardColor,
                     icon: Icons.logout_rounded,
                     title: "Sign Out",
                     color: primaryBlue,
                     onTap: () async {
-
                       await FirebaseAuth.instance.signOut();
 
                       if (!context.mounted) return;
@@ -209,6 +348,7 @@ class AppDrawer extends StatelessWidget {
                   /// DELETE ACCOUNT
                   _actionTile(
                     context,
+                    cardColor: cardColor,
                     icon: Icons.delete_forever_rounded,
                     title: "Delete Account",
                     color: danger,
@@ -221,39 +361,44 @@ class AppDrawer extends StatelessWidget {
             /// ================= FOOTER =================
             Padding(
               padding: const EdgeInsets.all(20),
+
               child: Column(
-                children: const [
+                children: [
 
-                  Divider(),
+                  Divider(
+                    color: isDarkMode
+                        ? Colors.white24
+                        : Colors.grey.shade300,
+                  ),
 
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
                   Text(
                     "SickleCare v1.0.0",
                     style: TextStyle(
-                      color: Colors.grey,
+                      color: subtitleColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
 
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
 
                   Text(
                     "Your daily health companion 💙",
                     style: TextStyle(
-                      color: Colors.grey,
+                      color: subtitleColor,
                       fontSize: 11,
                     ),
                   ),
 
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
                   Text(
                     "Developed for sickle cell support & awareness",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.grey,
+                      color: subtitleColor,
                       fontSize: 10,
                     ),
                   ),
@@ -267,7 +412,10 @@ class AppDrawer extends StatelessWidget {
   }
 
   /// ================= SECTION TITLE =================
-  Widget _sectionTitle(String title) {
+  Widget _sectionTitle(
+    String title,
+    bool isDarkMode,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(
         left: 10,
@@ -278,8 +426,9 @@ class AppDrawer extends StatelessWidget {
       child: Text(
         title,
 
-        style: const TextStyle(
-          color: Colors.grey,
+        style: TextStyle(
+          color:
+              isDarkMode ? Colors.white54 : Colors.grey,
           fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -296,10 +445,13 @@ class AppDrawer extends StatelessWidget {
     required String subtitle,
     required Color color,
     required Widget page,
+    required Color cardColor,
+    required Color textColor,
+    required Color subtitleColor,
   }) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: cardColor,
       margin: const EdgeInsets.only(bottom: 12),
 
       shape: RoundedRectangleBorder(
@@ -319,20 +471,26 @@ class AppDrawer extends StatelessWidget {
 
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
+            color: textColor,
           ),
         ),
 
-        subtitle: Text(subtitle),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            color: subtitleColor,
+          ),
+        ),
 
-        trailing: const Icon(
+        trailing: Icon(
           Icons.arrow_forward_ios_rounded,
           size: 16,
+          color: subtitleColor,
         ),
 
         onTap: () {
-
           Navigator.pop(context);
 
           Navigator.push(
@@ -353,10 +511,11 @@ class AppDrawer extends StatelessWidget {
     required String title,
     required Color color,
     required VoidCallback onTap,
+    required Color cardColor,
   }) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: cardColor,
       margin: const EdgeInsets.only(bottom: 12),
 
       shape: RoundedRectangleBorder(
@@ -394,7 +553,6 @@ class AppDrawer extends StatelessWidget {
 
   /// ================= DELETE ACCOUNT DIALOG =================
   void _showDeleteDialog(BuildContext context) {
-
     showDialog(
       context: context,
 
@@ -422,9 +580,7 @@ class AppDrawer extends StatelessWidget {
             ),
 
             onPressed: () async {
-
               try {
-
                 await FirebaseAuth.instance.currentUser?.delete();
 
                 if (!context.mounted) return;

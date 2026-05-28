@@ -3,71 +3,76 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationService {
-  static final FlutterLocalNotificationsPlugin notificationsPlugin =
+  static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  // ✅ INIT
+  /// INIT
   static Future<void> init() async {
     tz.initializeTimeZones();
 
-    const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings settings =
-        InitializationSettings(android: androidInit);
+    const settings = InitializationSettings(android: android);
 
-    await notificationsPlugin.initialize(settings);
+    await _plugin.initialize(settings);
   }
 
-  // ✅ SCHEDULE DAILY REMINDER (FIXED)
-  static Future<void> scheduleDailyReminder({
+  /// PERMISSION
+  static Future<void> requestPermission() async {
+    final android =
+        _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    await android?.requestNotificationsPermission();
+  }
+
+  /// SCHEDULE REMINDER (FIXED)
+  static Future<void> scheduleReminder({
     required int id,
     required String title,
-    required String body,
     required int hour,
     required int minute,
   }) async {
-    await notificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      _nextInstanceOfTime(hour, minute),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_channel',
-          'Daily Reminders',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
+    final now = tz.TZDateTime.now(tz.local);
 
-      // ✅ REQUIRED FIX
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-
-      // ✅ REPEAT DAILY
-      matchDateTimeComponents: DateTimeComponents.time,
-
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
     );
-  }
-
-  // ✅ CALCULATE NEXT TIME
-  static tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-
-    tz.TZDateTime scheduled =
-        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
 
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
-    return scheduled;
+    await _plugin.zonedSchedule(
+      id,
+      "Medication Reminder 💊",
+      title,
+      scheduled,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'reminders_channel',
+          'Reminders',
+          channelDescription: 'Medication reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
   }
 
-  // ❌ CANCEL REMINDER
+  /// CANCEL
   static Future<void> cancel(int id) async {
-    await notificationsPlugin.cancel(id);
+    await _plugin.cancel(id);
   }
 }

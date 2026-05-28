@@ -3,7 +3,11 @@ import 'package:sicklecare_app/main.dart';
 
 void main() {
   testWidgets('App loads successfully', (WidgetTester tester) async {
-    await tester.pumpWidget(const SickleCareApp());
+    await tester.pumpWidget(
+      const SickleCareApp(isDarkMode: false),
+    );
+
+    await tester.pumpAndSettle();
 
     expect(find.byType(SickleCareApp), findsOneWidget);
   });

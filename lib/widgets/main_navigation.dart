@@ -19,60 +19,80 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  late int currentIndex;
+  late int _currentIndex;
 
-  final List<Widget> screens = const [
-    HomeScreen(),
-    HydrationNutritionScreen(),
-    HistoryScreen(),
-    RemindersScreen(),
-    TrackerScreen(), // ✅ REPLACED PROFILE WITH TRACKER
+  // ── Screen builders — called fresh each time, no const issues ──────────────
+  static final _screens = <WidgetBuilder>[
+    (_) => const HomeScreen(),
+    (_) => const HydrationNutritionScreen(),
+    (_) => const HistoryScreen(),
+    (_) => const RemindersScreen(),
+    (_) => const TrackerScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
-    currentIndex = widget.currentIndex;
+    _currentIndex = widget.currentIndex;
   }
 
-  void onTap(int index) {
-    if (index == currentIndex) return;
+  void _onTap(int index) {
+    if (index == _currentIndex) return;
 
+    // Instant tab switch — no slide animation (feels like native bottom nav)
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => screens[index]),
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => _screens[index](context),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
+      currentIndex: _currentIndex,
+      onTap: _onTap,
       selectedItemColor: const Color(0xFF1E40AF),
       unselectedItemColor: Colors.grey,
+      backgroundColor: Colors.white,
       type: BottomNavigationBarType.fixed,
-
+      selectedLabelStyle: const TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 11,
+      ),
+      unselectedLabelStyle: const TextStyle(
+        fontWeight: FontWeight.w500,
+        fontSize: 11,
+      ),
+      elevation: 12,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          label: "Home",
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home_rounded),
+          label: 'Home',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.water_drop),
-          label: "Health",
+          icon: Icon(Icons.water_drop_outlined),
+          activeIcon: Icon(Icons.water_drop_rounded),
+          label: 'Health',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          label: "History",
+          icon: Icon(Icons.bar_chart_outlined),
+          activeIcon: Icon(Icons.bar_chart_rounded),
+          label: 'History',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.notifications),
-          label: "Reminders",
+          icon: Icon(Icons.notifications_outlined),
+          activeIcon: Icon(Icons.notifications_rounded),
+          label: 'Reminders',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.monitor_heart),
-          label: "Tracker",
+          icon: Icon(Icons.monitor_heart_outlined),
+          activeIcon: Icon(Icons.monitor_heart_rounded),
+          label: 'Tracker',
         ),
       ],
     );

@@ -7,24 +7,49 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─── MODELS ──────────────────────────────────────────────────────────────────
 
 enum MessageRole { user, assistant }
 
 class ChatMessage {
-  final String text;
+  final String      id;
+  final String      text;
   final MessageRole role;
-  final DateTime time;
-  final bool isVoice;
-  final String? imagePath;
+  final DateTime    time;
+  final bool        isVoice;
+  final String?     imagePath;
+
   ChatMessage({
+    required this.id,
     required this.text,
     required this.role,
     DateTime? time,
-    this.isVoice = false,
+    this.isVoice  = false,
     this.imagePath,
   }) : time = time ?? DateTime.now();
+
+  // ── Firestore serialization ────────────────────────────────────────────────
+
+  Map<String, dynamic> toFirestore() => {
+        'text':      text,
+        'role':      role == MessageRole.user ? 'user' : 'assistant',
+        'timestamp': FieldValue.serverTimestamp(),
+        'isVoice':   isVoice,
+      };
+
+  factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return ChatMessage(
+      id:       doc.id,
+      text:     d['text']    ?? '',
+      role:     d['role'] == 'user' ? MessageRole.user : MessageRole.assistant,
+      time:     (d['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isVoice:  d['isVoice'] ?? false,
+    );
+  }
 }
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
@@ -40,10 +65,10 @@ const _kBlueMid    = Color(0xFF2563EB);
 const _kBlueShadow = Color(0x401E40AF);
 const _kBlueBorder = Color(0x331E40AF);
 const _kBg         = Color(0xFFF0F4FF);
+const _kChatBg     = Color(0xFFEEF2FF);  // WhatsApp-style chat background
 const _kWhite      = Color(0xFFFFFFFF);
 const _kWhite85    = Color(0xD9FFFFFF);
 const _kWhite65    = Color(0xA6FFFFFF);
-const _kWhite20    = Color(0x33FFFFFF);
 const _kGrey       = Color(0xFF90A4AE);
 const _kGreyLight  = Color(0xFFECEFF1);
 const _kTextDark   = Color(0xFF1A237E);
@@ -71,11 +96,11 @@ const _kSystemPrompt =
     'End with gentle encouragement. Keep responses concise for mobile.';
 
 const _kSuggestions = [
-  "I'm in pain today 😔",
+  "I'm in pain today ",
   "What triggers a crisis?",
-  "How much water daily? 💧",
-  "I feel anxious 😟",
-  "Foods to avoid? 🍎",
+  "How much water daily? ",
+  "I feel anxious ",
+  "Foods to avoid? ",
   "Comment gérer la douleur?",
 ];
 
@@ -94,10 +119,19 @@ class _SupportScreenState extends State<SupportScreen>
   final _scrollCtrl = ScrollController();
   final _messages   = <ChatMessage>[];
 
-  bool   _loading      = false;
-  bool   _showChips    = true;
-  bool   _isListening  = false;
-  String _voiceDraft   = '';
+  // Firebase
+  final _auth      = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  String? get _uid => _auth.currentUser?.uid;
+  CollectionReference? get _msgCol => _uid == null
+      ? null
+      : _firestore.collection('chats').doc(_uid).collection('messages');
+
+  bool   _loading       = false;
+  bool   _showChips     = true;
+  bool   _isListening   = false;
+  bool   _firestoreReady = false;
+  String _voiceDraft    = '';
 
   String? _pendingImagePath;
   String? _pendingImageB64;
@@ -129,14 +163,7 @@ class _SupportScreenState extends State<SupportScreen>
         CurvedAnimation(parent: _micCtrl, curve: Curves.easeInOut));
 
     _initSpeech();
-
-    _messages.add(ChatMessage(
-      text: "Hi there! I'm Sika 🩸 — your SickleCare companion.\n\n"
-            "I'm here to listen, comfort, and support you through life "
-            "with sickle cell disease.\n\nShare what you're feeling — "
-            "by typing, using your voice 🎙️, or sending a photo 📷. 💙",
-      role: MessageRole.assistant,
-    ));
+    _loadMessages();
   }
 
   Future<void> _initSpeech() async {
@@ -144,6 +171,65 @@ class _SupportScreenState extends State<SupportScreen>
       onError: (e) => dev.log('Speech error: $e', name: 'SupportScreen'),
     );
     setState(() {});
+  }
+
+  // ── Load messages from Firestore ───────────────────────────────────────────
+
+  Future<void> _loadMessages() async {
+    if (_msgCol == null) {
+      // Not logged in — use local welcome only
+      _addWelcome();
+      setState(() => _firestoreReady = true);
+      return;
+    }
+
+    try {
+      final snap = await _msgCol!
+          .orderBy('timestamp', descending: false)
+          .limit(100)
+          .get();
+
+      if (snap.docs.isEmpty) {
+        // First time — add welcome and save it
+        _addWelcome();
+        await _saveToFirestore(_messages.first);
+      } else {
+        setState(() {
+          _messages.addAll(snap.docs.map(ChatMessage.fromFirestore));
+          _showChips = _messages.length <= 1;
+        });
+      }
+    } catch (e) {
+      dev.log('Load messages error: $e', name: 'SupportScreen');
+      _addWelcome();
+    }
+
+    setState(() => _firestoreReady = true);
+    _scrollToBottom();
+  }
+
+  void _addWelcome() {
+    _messages.add(ChatMessage(
+      id:   'welcome',
+      text: "Hi there! I'm Sika  — your SickleCare companion.\n\n"
+            "I'm here to listen, comfort, and guide you through life "
+            "with sickle cell disease.\n\nShare what you're feeling — "
+            "type, use your voice 🎙️, or send a photo 📷. 💙\n\n"
+            "⚠️ I am not a medical doctor. Always consult your healthcare "
+            "provider for medical decisions.",
+      role: MessageRole.assistant,
+    ));
+  }
+
+  // ── Save single message to Firestore ──────────────────────────────────────
+
+  Future<void> _saveToFirestore(ChatMessage msg) async {
+    if (_msgCol == null) return;
+    try {
+      await _msgCol!.add(msg.toFirestore());
+    } catch (e) {
+      dev.log('Save message error: $e', name: 'SupportScreen');
+    }
   }
 
   @override
@@ -158,31 +244,38 @@ class _SupportScreenState extends State<SupportScreen>
 
   // ── Voice ──────────────────────────────────────────────────────────────────
 
-  Future<void> _toggleVoice() async {
-    if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      if (_voiceDraft.trim().isNotEmpty) {
-        final text = _voiceDraft.trim();
-        _voiceDraft = '';
-        _send(text, isVoice: true);
-      }
-    } else {
-      if (!_speechAvailable) return;
-      setState(() {
-        _isListening = true;
-        _voiceDraft  = '';
-      });
-      await _speech.listen(
-        onResult: (r) => setState(() => _voiceDraft = r.recognizedWords),
-        localeId: 'en_US',
-        listenOptions: stt.SpeechListenOptions(
-          cancelOnError: true,
-          partialResults: true,
-        ),
-      );
+ Future<void> _toggleVoice() async {
+  if (_isListening) {
+    await _speech.stop();
+    setState(() => _isListening = false);
+
+    if (_voiceDraft.trim().isNotEmpty) {
+      final text = _voiceDraft.trim();
+      _voiceDraft = '';
+      _send(text, isVoice: true);
     }
+  } else {
+    if (!_speechAvailable) return;
+
+    setState(() {
+      _isListening = true;
+      _voiceDraft = '';
+    });
+
+    await _speech.listen(
+      onResult: (r) => setState(() {
+        _voiceDraft = r.recognizedWords;
+      }),
+
+      // DEPRECATED USAGE
+      listenOptions: stt.SpeechListenOptions(
+        localeId: 'en_US', 
+        cancelOnError: true,
+        partialResults: true,
+      ),
+    );
   }
+}
 
   // ── Image Picker ───────────────────────────────────────────────────────────
 
@@ -191,8 +284,7 @@ class _SupportScreenState extends State<SupportScreen>
       context: context,
       backgroundColor: _kCardBg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -215,16 +307,10 @@ class _SupportScreenState extends State<SupportScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _imageSourceTile(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Camera',
-                    onTap: () => _pickImage(ImageSource.camera),
-                  ),
-                  _imageSourceTile(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Gallery',
-                    onTap: () => _pickImage(ImageSource.gallery),
-                  ),
+                  _imgTile(Icons.camera_alt_rounded, 'Camera',
+                      () => _pickImage(ImageSource.camera)),
+                  _imgTile(Icons.photo_library_rounded, 'Gallery',
+                      () => _pickImage(ImageSource.gallery)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -235,11 +321,7 @@ class _SupportScreenState extends State<SupportScreen>
     );
   }
 
-  Widget _imageSourceTile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) =>
+  Widget _imgTile(IconData icon, String label, VoidCallback onTap) =>
       GestureDetector(
         onTap: onTap,
         child: Column(
@@ -249,13 +331,11 @@ class _SupportScreenState extends State<SupportScreen>
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [_kRed, _kRedDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                    colors: [_kRed, _kRedDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
                 boxShadow: [
-                  BoxShadow(
-                      color: _kRedGlow, blurRadius: 12, offset: Offset(0, 4))
+                  BoxShadow(color: _kRedGlow, blurRadius: 12, offset: Offset(0, 4))
                 ],
               ),
               child: Icon(icon, color: _kWhite, size: 28),
@@ -273,10 +353,7 @@ class _SupportScreenState extends State<SupportScreen>
   Future<void> _pickImage(ImageSource source) async {
     Navigator.pop(context);
     final picked = await _picker.pickImage(
-      source: source,
-      imageQuality: 75,
-      maxWidth: 1024,
-    );
+        source: source, imageQuality: 75, maxWidth: 1024);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() {
@@ -285,25 +362,27 @@ class _SupportScreenState extends State<SupportScreen>
     });
   }
 
-  // ── Groq API ───────────────────────────────────────────────────────────────
+  // ── Groq API + Firestore Save ──────────────────────────────────────────────
 
   Future<void> _send(String text, {bool isVoice = false}) async {
     final trimmed  = text.trim();
     final hasText  = trimmed.isNotEmpty;
     final hasImage = _pendingImageB64 != null;
-
     if ((!hasText && !hasImage) || _loading) return;
 
     final imgPathSnap = _pendingImagePath;
     final imgB64Snap  = _pendingImageB64;
 
+    final userMsg = ChatMessage(
+      id:        DateTime.now().millisecondsSinceEpoch.toString(),
+      text:      hasText ? trimmed : '📷 Photo',
+      role:      MessageRole.user,
+      isVoice:   isVoice,
+      imagePath: imgPathSnap,
+    );
+
     setState(() {
-      _messages.add(ChatMessage(
-        text:      hasText ? trimmed : '📷 Photo',
-        role:      MessageRole.user,
-        isVoice:   isVoice,
-        imagePath: imgPathSnap,
-      ));
+      _messages.add(userMsg);
       _loading          = true;
       _showChips        = false;
       _pendingImagePath = null;
@@ -312,42 +391,33 @@ class _SupportScreenState extends State<SupportScreen>
     _textCtrl.clear();
     _scrollToBottom();
 
+    // Persist user message
+    await _saveToFirestore(userMsg);
+
     try {
       final useVision = imgB64Snap != null;
-      final model = useVision
+      final model     = useVision
           ? 'meta-llama/llama-4-scout-17b-16e-instruct'
           : 'llama-3.3-70b-versatile';
 
       dynamic userContent;
       if (useVision) {
         userContent = [
-          {
-            'type': 'image_url',
-            'image_url': {'url': 'data:image/jpeg;base64,$imgB64Snap'},
-          },
-          {
-            'type': 'text',
-            'text': hasText
-                ? trimmed
-                : 'Please look at this image and respond helpfully in the context of sickle cell disease wellness.',
-          },
+          {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,$imgB64Snap'}},
+          {'type': 'text', 'text': hasText ? trimmed : 'Please look at this image and respond helpfully in the context of sickle cell disease wellness.'},
         ];
       } else {
         userContent = trimmed;
       }
 
-      final start =
-          (_messages.length - 1 - 10).clamp(0, _messages.length - 1);
-      final history = <Map<String, dynamic>>[];
-      for (int i = start; i < _messages.length - 1; i++) {
-        final m = _messages[i];
-        history.add({
-          'role':    m.role == MessageRole.user ? 'user' : 'assistant',
-          'content': m.text,
-        });
-      }
+      // Send last 10 messages as context
+      final start   = (_messages.length - 10).clamp(0, _messages.length);
+      final history = _messages.sublist(start, _messages.length - 1).map((m) => {
+            'role':    m.role == MessageRole.user ? 'user' : 'assistant',
+            'content': m.text,
+          }).toList();
 
-      final msgs = <Map<String, dynamic>>[
+      final msgs = [
         {'role': 'system', 'content': _kSystemPrompt},
         ...history,
         {'role': 'user', 'content': userContent},
@@ -372,13 +442,17 @@ class _SupportScreenState extends State<SupportScreen>
       dev.log('Groq status: ${res.statusCode}', name: 'SupportScreen');
 
       if (res.statusCode == 200) {
-        final reply = jsonDecode(
-            res.body)['choices'][0]['message']['content'] as String;
-        setState(() => _messages
-            .add(ChatMessage(text: reply, role: MessageRole.assistant)));
+        final reply = jsonDecode(res.body)['choices'][0]['message']['content'] as String;
+        final sikaMsg = ChatMessage(
+          id:   DateTime.now().millisecondsSinceEpoch.toString(),
+          text: reply,
+          role: MessageRole.assistant,
+        );
+        setState(() => _messages.add(sikaMsg));
+        // Persist Sika reply
+        await _saveToFirestore(sikaMsg);
       } else {
-        final errMsg =
-            jsonDecode(res.body)['error']?['message'] ?? 'Error';
+        final errMsg = jsonDecode(res.body)['error']?['message'] ?? 'Error';
         _addError(errMsg);
       }
     } on Exception catch (e) {
@@ -389,10 +463,49 @@ class _SupportScreenState extends State<SupportScreen>
     }
   }
 
-  void _addError(String detail) => _messages.add(ChatMessage(
-      text: "Couldn't reach Sika right now.\n$detail\n\n"
-            "Please check your connection and try again. 💙",
-      role: MessageRole.assistant));
+  void _addError(String detail) {
+    final errMsg = ChatMessage(
+      id:   DateTime.now().millisecondsSinceEpoch.toString(),
+      text: "Couldn't reach Sika right now.\n$detail\n\nCheck your connection and try again. ",
+      role: MessageRole.assistant,
+    );
+    setState(() => _messages.add(errMsg));
+  }
+
+  // ── Clear chat ─────────────────────────────────────────────────────────────
+
+  Future<void> _clearChat() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Clear Chat'),
+        content: const Text('This will delete all messages with Sika. Continue?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _kRed),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear', style: TextStyle(color: _kWhite)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    if (_msgCol != null) {
+      final snap = await _msgCol!.get();
+      for (final doc in snap.docs) { await doc.reference.delete(); }
+    }
+    setState(() {
+      _messages.clear();
+      _showChips = true;
+    });
+    _addWelcome();
+    if (_msgCol != null) await _saveToFirestore(_messages.first);
+  }
 
   void _scrollToBottom() =>
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -410,31 +523,31 @@ class _SupportScreenState extends State<SupportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: _kChatBg,
       appBar: _buildAppBar(),
-      // ── No drawer, no bottomNavigationBar ──
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeroBanner(),
-            Expanded(child: _buildList()),
-            if (_isListening) _buildVoiceOverlay(),
-            if (_pendingImagePath != null) _buildImagePreview(),
-            if (_showChips && !_isListening) _buildChips(),
-            _buildInput(),
-          ],
-        ),
-      ),
+      body: !_firestoreReady
+          ? const Center(child: CircularProgressIndicator(color: _kBlue))
+          : SafeArea(
+              child: Column(
+                children: [
+                  _buildDisclaimerBanner(),
+                  Expanded(child: _buildList()),
+                  if (_isListening) _buildVoiceOverlay(),
+                  if (_pendingImagePath != null) _buildImagePreview(),
+                  if (_showChips && !_isListening) _buildChips(),
+                  _buildInput(),
+                ],
+              ),
+            ),
     );
   }
 
-  // ── AppBar — back arrow only ───────────────────────────────────────────────
+  // ── AppBar ─────────────────────────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar() => AppBar(
         backgroundColor: _kBlue,
         elevation: 0,
         titleSpacing: 0,
-        // Back arrow → pops back to wherever we came from (HomeScreen)
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: _kWhite, size: 20),
@@ -442,6 +555,7 @@ class _SupportScreenState extends State<SupportScreen>
         ),
         title: Row(
           children: [
+            // Pulsing logo avatar
             AnimatedBuilder(
               animation: _pulseAnim,
               builder: (_, __) {
@@ -450,7 +564,7 @@ class _SupportScreenState extends State<SupportScreen>
                   alignment: Alignment.center,
                   children: [
                     Container(
-                      width: 44, height: 44,
+                      width: 46, height: 46,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -460,17 +574,20 @@ class _SupportScreenState extends State<SupportScreen>
                       ),
                     ),
                     Container(
-                      width: 34, height: 34,
+                      width: 36, height: 36,
                       decoration: const BoxDecoration(
-                          shape: BoxShape.circle, color: _kWhite20),
-                      child: Center(
-                        child: ClipOval(
+                        shape: BoxShape.circle,
+                        color: _kWhite,
+                      ),
+                      child: ClipOval(
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
                           child: Image.asset(
                             'assets/logo.png',
-                            width: 26, height: 26,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Text(
-                                '🩸', style: TextStyle(fontSize: 16)),
+                            errorBuilder: (_, __, ___) => const Center(
+                                child: Text('🩸',
+                                    style: TextStyle(fontSize: 17))),
                           ),
                         ),
                       ),
@@ -480,90 +597,82 @@ class _SupportScreenState extends State<SupportScreen>
               },
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Sika · SickleCare',
-                    style: GoogleFonts.sora(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _kWhite)),
-                Row(
-                  children: [
-                    Container(
-                      width: 6, height: 6,
-                      decoration: const BoxDecoration(
-                          shape: BoxShape.circle, color: _kGreen),
-                    ),
-                    const SizedBox(width: 5),
-                    Text('Online · SCD Companion',
-                        style: GoogleFonts.dmSans(
-                            fontSize: 11, color: _kWhite85)),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: _kWhite, size: 20),
-            onPressed: _showInfo,
-          ),
-        ],
-      );
-
-  // ── Hero Banner ────────────────────────────────────────────────────────────
-
-  Widget _buildHeroBanner() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFCDD2), Color(0xFFBBDEFB)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46, height: 46,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: _kWhite,
-                boxShadow: [
-                  BoxShadow(
-                      color: _kRedGlow, blurRadius: 12, offset: Offset(0, 4))
-                ],
-              ),
-              child: ClipOval(
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(
-                    'assets/logo.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                        child: Text('🩸', style: TextStyle(fontSize: 20))),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('You are not alone',
+                  Text('Sika · SickleCare AI',
                       style: GoogleFonts.sora(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: _kTextDark)),
-                  const SizedBox(height: 2),
-                  Text('Type, speak 🎙️ or send a photo 📷',
-                      style: GoogleFonts.dmSans(
-                          fontSize: 11, color: _kGrey)),
+                          color: _kWhite)),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6, height: 6,
+                        decoration: const BoxDecoration(
+                            shape: BoxShape.circle, color: _kGreen),
+                      ),
+                      const SizedBox(width: 5),
+                      Text('Online · Not a medical doctor',
+                          style: GoogleFonts.dmSans(
+                              fontSize: 10, color: _kWhite85)),
+                    ],
+                  ),
                 ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: _kWhite),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+            onSelected: (v) {
+              if (v == 'clear') _clearChat();
+              if (v == 'info') _showInfo();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                  value: 'info',
+                  child: Row(children: [
+                    Icon(Icons.info_outline, size: 18),
+                    SizedBox(width: 10),
+                    Text('About Sika'),
+                  ])),
+              const PopupMenuItem(
+                  value: 'clear',
+                  child: Row(children: [
+                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    SizedBox(width: 10),
+                    Text('Clear Chat',
+                        style: TextStyle(color: Colors.red)),
+                  ])),
+            ],
+          ),
+        ],
+      );
+
+  // ── Disclaimer Banner ──────────────────────────────────────────────────────
+
+  Widget _buildDisclaimerBanner() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: const Color(0xFFFFF3E0),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFE65100), size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Sika is an AI companion, not a medical doctor. '
+                'Always consult your healthcare provider for medical decisions.',
+                style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    color: const Color(0xFFE65100),
+                    height: 1.4),
               ),
             ),
           ],
@@ -574,24 +683,67 @@ class _SupportScreenState extends State<SupportScreen>
 
   Widget _buildList() => ListView.builder(
         controller: _scrollCtrl,
-        padding: const EdgeInsets.fromLTRB(14, 16, 14, 6),
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
         itemCount: _messages.length + (_loading ? 1 : 0),
         itemBuilder: (_, i) {
           if (i == _messages.length) return _typingBubble();
-          return _bubble(_messages[i]);
+          // Date separator
+          final msg  = _messages[i];
+          final prev = i > 0 ? _messages[i - 1] : null;
+          final showDate = prev == null ||
+              !_sameDay(prev.time, msg.time);
+          return Column(
+            children: [
+              if (showDate) _dateSeparator(msg.time),
+              _bubble(msg),
+            ],
+          );
         },
       );
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Widget _dateSeparator(DateTime t) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDE4FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _formatDate(t),
+              style: GoogleFonts.dmSans(
+                  fontSize: 11,
+                  color: _kTextDark,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+      );
+
+  String _formatDate(DateTime t) {
+    final now   = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day   = DateTime(t.year, t.month, t.day);
+    if (day == today) return 'Today';
+    if (day == today.subtract(const Duration(days: 1))) return 'Yesterday';
+    return '${t.day}/${t.month}/${t.year}';
+  }
 
   Widget _bubble(ChatMessage msg) {
     final isUser = msg.role == MessageRole.user;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 360),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       builder: (_, v, child) => Opacity(
         opacity: v,
         child: Transform.translate(
-            offset: Offset(0, 14 * (1 - v)), child: child),
+            offset: Offset(isUser ? 20 * (1 - v) : -20 * (1 - v), 0),
+            child: child),
       ),
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -599,43 +751,47 @@ class _SupportScreenState extends State<SupportScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // Sika logo avatar
             if (!isUser) ...[
               Container(
-                width: 34, height: 34,
+                width: 32, height: 32,
+                margin: const EdgeInsets.only(bottom: 4),
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [_kRed, _kRedDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: _kWhite,
                   boxShadow: [
                     BoxShadow(
                         color: _kRedGlow,
-                        blurRadius: 8,
-                        offset: Offset(0, 3))
+                        blurRadius: 6,
+                        offset: Offset(0, 2))
                   ],
                 ),
                 child: ClipOval(
                   child: Padding(
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.all(4),
                     child: Image.asset(
                       'assets/logo.png',
                       fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Center(
-                          child: Text('🩸', style: TextStyle(fontSize: 15))),
+                          child:
+                              Text('🩸', style: TextStyle(fontSize: 14))),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
             ],
+
+            // Bubble
             ConstrainedBox(
               constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.74),
+                  maxWidth: MediaQuery.of(context).size.width * 0.76),
               child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
+                  // WhatsApp style: green-tint for user, white for Sika
                   gradient: isUser
                       ? const LinearGradient(
                           colors: [_kBlueMid, _kBlue],
@@ -645,108 +801,104 @@ class _SupportScreenState extends State<SupportScreen>
                       : null,
                   color: isUser ? null : _kCardBg,
                   borderRadius: BorderRadius.only(
-                    topLeft:     const Radius.circular(20),
-                    topRight:    const Radius.circular(20),
-                    bottomLeft:  Radius.circular(isUser ? 20 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 20),
+                    topLeft:     const Radius.circular(18),
+                    topRight:    const Radius.circular(18),
+                    bottomLeft:  Radius.circular(isUser ? 18 : 4),
+                    bottomRight: Radius.circular(isUser ? 4 : 18),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color:      isUser ? _kBlueShadow : _kShadowSm,
-                      blurRadius: 14,
-                      offset:     const Offset(0, 4),
+                      blurRadius: 8,
+                      offset:     const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (!isUser)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 6, height: 6,
-                                decoration: const BoxDecoration(
-                                    shape: BoxShape.circle, color: _kRed),
-                              ),
-                              const SizedBox(width: 5),
-                              Text('Sika',
-                                  style: GoogleFonts.sora(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: _kRed)),
-                            ],
-                          ),
-                        ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Sika name tag
+                    if (!isUser)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Text('Sika',
+                            style: GoogleFonts.sora(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _kRed)),
+                      ),
 
-                      if (isUser && msg.isVoice)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 5),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.mic,
-                                  color: _kWhite85, size: 12),
-                              const SizedBox(width: 4),
-                              Text('Voice message',
-                                  style: GoogleFonts.dmSans(
-                                      fontSize: 10, color: _kWhite65)),
-                            ],
-                          ),
-                        ),
-
-                      if (msg.imagePath != null) ...[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            File(msg.imagePath!),
-                            width: double.infinity,
-                            height: 180,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-
-                      if (msg.text != '📷 Photo' || msg.imagePath == null)
-                        Text(
-                          msg.text,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 14,
-                            height: 1.6,
-                            color: isUser ? _kWhite : _kTextDark,
-                          ),
-                        ),
-
-                      const SizedBox(height: 5),
-                      Align(
-                        alignment: Alignment.bottomRight,
+                    // Voice badge
+                    if (isUser && msg.isVoice)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (isUser && msg.imagePath != null)
-                              const Padding(
-                                padding: EdgeInsets.only(right: 4),
-                                child: Icon(Icons.image_rounded,
-                                    size: 11, color: _kWhite65),
-                              ),
-                            Text(
-                              _fmt(msg.time),
-                              style: GoogleFonts.dmSans(
-                                  fontSize: 10,
-                                  color: isUser ? _kWhite65 : _kGrey),
-                            ),
+                            const Icon(Icons.mic,
+                                color: _kWhite85, size: 11),
+                            const SizedBox(width: 3),
+                            Text('Voice',
+                                style: GoogleFonts.dmSans(
+                                    fontSize: 10, color: _kWhite65)),
                           ],
                         ),
                       ),
+
+                    // Image
+                    if (msg.imagePath != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(msg.imagePath!),
+                          width: double.infinity,
+                          height: 180,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                     ],
-                  ),
+
+                    // Text
+                    if (msg.text != '📷 Photo' || msg.imagePath == null)
+                      Text(
+                        msg.text,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          height: 1.55,
+                          color: isUser ? _kWhite : _kTextDark,
+                        ),
+                      ),
+
+                    // Timestamp row (WhatsApp style)
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isUser && msg.imagePath != null)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 3),
+                              child: Icon(Icons.image_rounded,
+                                  size: 10, color: _kWhite65),
+                            ),
+                          Text(
+                            _fmt(msg.time),
+                            style: GoogleFonts.dmSans(
+                                fontSize: 10,
+                                color:
+                                    isUser ? _kWhite65 : _kGrey),
+                          ),
+                          if (isUser) ...[
+                            const SizedBox(width: 3),
+                            const Icon(Icons.done_all,
+                                size: 12, color: _kWhite65),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -760,50 +912,50 @@ class _SupportScreenState extends State<SupportScreen>
   // ── Typing Indicator ───────────────────────────────────────────────────────
 
   Widget _typingBubble() => Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 14),
+        padding: const EdgeInsets.only(bottom: 6, left: 10),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Container(
-              width: 34, height: 34,
+              width: 32, height: 32,
+              margin: const EdgeInsets.only(bottom: 4),
               decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [_kRed, _kRedDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  shape: BoxShape.circle, color: _kWhite),
+              child: ClipOval(
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Image.asset('assets/logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Center(
+                          child:
+                              Text('🩸', style: TextStyle(fontSize: 14)))),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                      color: _kRedGlow, blurRadius: 8, offset: Offset(0, 3))
-                ],
               ),
-              child: const Center(
-                  child: Text('🩸', style: TextStyle(fontSize: 15))),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 18, vertical: 14),
+                  horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
                 color: _kCardBg,
                 borderRadius: BorderRadius.only(
-                  topLeft:     Radius.circular(20),
-                  topRight:    Radius.circular(20),
-                  bottomRight: Radius.circular(20),
+                  topLeft:     Radius.circular(18),
+                  topRight:    Radius.circular(18),
+                  bottomRight: Radius.circular(18),
                   bottomLeft:  Radius.circular(4),
                 ),
                 boxShadow: [
                   BoxShadow(
                       color: _kShadowSm,
-                      blurRadius: 10,
-                      offset: Offset(0, 4))
+                      blurRadius: 8,
+                      offset: Offset(0, 2))
                 ],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: List.generate(3,
+                children: List.generate(
+                    3,
                     (i) => _TypingDot(
                         delay: Duration(milliseconds: i * 200))),
               ),
@@ -815,19 +967,18 @@ class _SupportScreenState extends State<SupportScreen>
   // ── Voice Overlay ──────────────────────────────────────────────────────────
 
   Widget _buildVoiceOverlay() => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFFEBEE), Color(0xFFE3F2FD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _kRedBorder),
           boxShadow: const [
-            BoxShadow(
-                color: _kRedGlow, blurRadius: 16, offset: Offset(0, 4))
+            BoxShadow(color: _kRedGlow, blurRadius: 14, offset: Offset(0, 4))
           ],
         ),
         child: Row(
@@ -837,26 +988,25 @@ class _SupportScreenState extends State<SupportScreen>
               builder: (_, __) => Transform.scale(
                 scale: _micAnim.value,
                 child: Container(
-                  width: 44, height: 44,
+                  width: 42, height: 42,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [_kRed, _kRedDark],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                        colors: [_kRed, _kRedDark],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
                     boxShadow: [
                       BoxShadow(
                           color: _kRedShadow,
-                          blurRadius: 16,
+                          blurRadius: 14,
                           offset: Offset(0, 4))
                     ],
                   ),
-                  child: const Icon(Icons.mic, color: _kWhite, size: 22),
+                  child: const Icon(Icons.mic, color: _kWhite, size: 20),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -866,7 +1016,7 @@ class _SupportScreenState extends State<SupportScreen>
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: _kRed)),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     _voiceDraft.isEmpty
                         ? 'Speak now — Sika is listening 🎙️'
@@ -886,14 +1036,13 @@ class _SupportScreenState extends State<SupportScreen>
             GestureDetector(
               onTap: _toggleVoice,
               child: Container(
-                width: 36, height: 36,
+                width: 34, height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _kRedLight,
                   border: Border.all(color: _kRedBorder),
                 ),
-                child: const Icon(Icons.stop_rounded,
-                    color: _kRed, size: 18),
+                child: const Icon(Icons.stop_rounded, color: _kRed, size: 17),
               ),
             ),
           ],
@@ -903,32 +1052,29 @@ class _SupportScreenState extends State<SupportScreen>
   // ── Pending Image Preview ──────────────────────────────────────────────────
 
   Widget _buildImagePreview() => Container(
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
         child: Row(
           children: [
             Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(_pendingImagePath!),
-                    width: 80, height: 80,
-                    fit: BoxFit.cover,
-                  ),
+                  child: Image.file(File(_pendingImagePath!),
+                      width: 72, height: 72, fit: BoxFit.cover),
                 ),
                 Positioned(
-                  top: 3, right: 3,
+                  top: 2, right: 2,
                   child: GestureDetector(
                     onTap: () => setState(() {
                       _pendingImagePath = null;
                       _pendingImageB64  = null;
                     }),
                     child: Container(
-                      width: 20, height: 20,
+                      width: 18, height: 18,
                       decoration: const BoxDecoration(
                           shape: BoxShape.circle, color: _kRed),
                       child: const Icon(Icons.close,
-                          color: _kWhite, size: 13),
+                          color: _kWhite, size: 12),
                     ),
                   ),
                 ),
@@ -936,11 +1082,9 @@ class _SupportScreenState extends State<SupportScreen>
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                'Photo ready — add a message or tap send ↗',
-                style: GoogleFonts.dmSans(
-                    fontSize: 12, color: _kGrey, height: 1.5),
-              ),
+              child: Text('Photo ready — add a message or tap send ↗',
+                  style: GoogleFonts.dmSans(
+                      fontSize: 12, color: _kGrey, height: 1.5)),
             ),
           ],
         ),
@@ -952,7 +1096,7 @@ class _SupportScreenState extends State<SupportScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 6, top: 4),
+            padding: const EdgeInsets.only(left: 14, bottom: 5, top: 4),
             child: Text('Quick questions',
                 style: GoogleFonts.dmSans(
                     fontSize: 11,
@@ -961,25 +1105,25 @@ class _SupportScreenState extends State<SupportScreen>
                     letterSpacing: 0.3)),
           ),
           SizedBox(
-            height: 40,
+            height: 38,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: _kSuggestions.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) => GestureDetector(
                 onTap: () => _send(_kSuggestions[i]),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
+                      horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: _kCardBg,
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: _kRedBorder),
                     boxShadow: const [
                       BoxShadow(
                           color: _kShadowSm,
-                          blurRadius: 6,
+                          blurRadius: 4,
                           offset: Offset(0, 2))
                     ],
                   ),
@@ -992,19 +1136,18 @@ class _SupportScreenState extends State<SupportScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
       );
 
   // ── Input Bar ──────────────────────────────────────────────────────────────
 
   Widget _buildInput() => Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
         decoration: const BoxDecoration(
           color: _kCardBg,
           boxShadow: [
-            BoxShadow(
-                color: _kShadowMd, blurRadius: 18, offset: Offset(0, -4))
+            BoxShadow(color: _kShadowMd, blurRadius: 16, offset: Offset(0, -3))
           ],
         ),
         child: Row(
@@ -1014,7 +1157,7 @@ class _SupportScreenState extends State<SupportScreen>
               onTap: _speechAvailable ? _toggleVoice : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                width: 46, height: 46,
+                width: 44, height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _isListening ? _kRed : _kRedLight,
@@ -1023,7 +1166,7 @@ class _SupportScreenState extends State<SupportScreen>
                       ? const [
                           BoxShadow(
                               color: _kRedShadow,
-                              blurRadius: 12,
+                              blurRadius: 10,
                               offset: Offset(0, 3))
                         ]
                       : [],
@@ -1031,18 +1174,18 @@ class _SupportScreenState extends State<SupportScreen>
                 child: Icon(
                   _isListening ? Icons.mic : Icons.mic_none_rounded,
                   color: _isListening ? _kWhite : _kRed,
-                  size: 20,
+                  size: 19,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
 
             // Image
             GestureDetector(
               onTap: _showImageSourceSheet,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 46, height: 46,
+                width: 44, height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _pendingImagePath != null ? _kRedTint10 : _kBg,
@@ -1057,23 +1200,23 @@ class _SupportScreenState extends State<SupportScreen>
                       ? Icons.image_rounded
                       : Icons.add_photo_alternate_rounded,
                   color: _pendingImagePath != null ? _kRed : _kBlue,
-                  size: 20,
+                  size: 19,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
 
             // Text field
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   color: _kBg,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(26),
                   border: Border.all(color: _kBlueBorder),
                 ),
                 child: Row(
                   children: [
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: TextField(
                         controller: _textCtrl,
@@ -1087,7 +1230,7 @@ class _SupportScreenState extends State<SupportScreen>
                               fontSize: 14, color: _kGrey),
                           border: InputBorder.none,
                           contentPadding:
-                              const EdgeInsets.symmetric(vertical: 13),
+                              const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onSubmitted: _send,
                       ),
@@ -1097,13 +1240,13 @@ class _SupportScreenState extends State<SupportScreen>
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
 
             // Send
             GestureDetector(
               onTap: () => _send(_textCtrl.text),
               child: Container(
-                width: 46, height: 46,
+                width: 44, height: 44,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
@@ -1114,12 +1257,12 @@ class _SupportScreenState extends State<SupportScreen>
                   boxShadow: [
                     BoxShadow(
                         color: _kRedShadow,
-                        blurRadius: 14,
+                        blurRadius: 12,
                         offset: Offset(0, 4))
                   ],
                 ),
-                child: const Icon(Icons.send_rounded,
-                    color: _kWhite, size: 19),
+                child:
+                    const Icon(Icons.send_rounded, color: _kWhite, size: 18),
               ),
             ),
           ],
@@ -1153,14 +1296,10 @@ class _SupportScreenState extends State<SupportScreen>
               Row(
                 children: [
                   Container(
-                    width: 52, height: 52,
+                    width: 54, height: 54,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [_kRed, _kRedDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: _kWhite,
                       boxShadow: [
                         BoxShadow(
                             color: _kRedGlow,
@@ -1175,7 +1314,7 @@ class _SupportScreenState extends State<SupportScreen>
                             fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) => const Center(
                                 child: Text('🩸',
-                                    style: TextStyle(fontSize: 22)))),
+                                    style: TextStyle(fontSize: 24)))),
                       ),
                     ),
                   ),
@@ -1188,7 +1327,7 @@ class _SupportScreenState extends State<SupportScreen>
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               color: _kTextDark)),
-                      Text('AI Support Companion · SickleCare Cameroon',
+                      Text('AI Companion · SickleCare Cameroon',
                           style: GoogleFonts.dmSans(
                               fontSize: 11, color: _kGrey)),
                     ],
@@ -1201,7 +1340,8 @@ class _SupportScreenState extends State<SupportScreen>
                 'empathy, wellness guidance, and encouragement — '
                 'in English and French.\n\n'
                 '🎙️ Tap the mic to speak.\n'
-                '📷 Tap the photo icon to share an image.',
+                '📷 Tap the photo icon to share an image.\n'
+                '💬 Your chat history is saved automatically.',
                 style: GoogleFonts.dmSans(
                     fontSize: 14, color: _kTextDark, height: 1.65),
               ),
@@ -1209,22 +1349,24 @@ class _SupportScreenState extends State<SupportScreen>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _kRedLight,
+                  color: const Color(0xFFFFF3E0),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _kRedBorder),
+                  border: Border.all(
+                      color: const Color(0x40E65100)),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.warning_amber_rounded,
-                        color: _kRed, size: 20),
+                        color: Color(0xFFE65100), size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Sika is not a medical doctor. Always consult your '
-                        'healthcare provider for medical decisions.',
+                        '⚠️ Sika is NOT a medical doctor. She provides '
+                        'emotional support and general wellness information only. '
+                        'Always consult your healthcare provider for medical decisions.',
                         style: GoogleFonts.dmSans(
                             fontSize: 12,
-                            color: _kRedDark,
+                            color: const Color(0xFFE65100),
                             height: 1.5),
                       ),
                     ),

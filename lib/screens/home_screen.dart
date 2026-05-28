@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
 
-      // ================= BOTTOM NAVIGATION =================
+      // BOTTOM NAVIGATION 
       bottomNavigationBar: const MainNavigation(
         currentIndex: 0,
       ),
@@ -205,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                   const SizedBox(height: 25),
 
-                  // ================= METRICS =================
+                  // METRICS
 
                   Row(
                     children: [
