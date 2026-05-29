@@ -21,16 +21,25 @@ build/
 .flutter-plugins-dependencies
 .metadata
 
+<<<<<<< HEAD
 # ------------------------------
 # Firebase
 # ------------------------------
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+=======
+/.dart_tool/
+/.flutter-plugins
+
+# Symbolication related
+app.*.symbols
+>>>>>>> 0d152fc (Save current working folder state before history sync)
 
 # ------------------------------
 # Environment / secrets
 # ------------------------------
 .env
+<<<<<<< HEAD
 .env.*
 
 # ------------------------------
@@ -44,3 +53,7 @@ ios/.symlinks/
 # Logs
 # ------------------------------
 *.log
+=======
+
+
+>>>>>>> 0d152fc (Save current working folder state before history sync)
