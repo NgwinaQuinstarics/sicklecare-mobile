@@ -112,8 +112,8 @@ Firebase rules (secured mode recommended)
 4. Run the App
 Bash
 flutter run
-🧪 Current Status
-✅ Completed
+ Current Status
+ Completed
 Authentication system
 Health tracking module
 Firebase integration
@@ -121,7 +121,7 @@ Notifications system
 Analytics dashboard
 Support center UI
 
-🚧 In Progress / Planned
+ In Progress / Planned
 Admin dashboard (users & FAQs management)
 Advanced AI assistant (health insights)
 Cloud performance optimization
