@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../l10n/strings.dart';
+import '../providers/auth_provider.dart';
+import 'doctor/doctor_dashboard_screen.dart';
 import 'home_screen.dart';
 import 'history_screen.dart';
 import 'tracker_screen.dart';
@@ -31,6 +35,15 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (auth.profileLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (auth.isDoctor) {
+      // Role-aware shell only: doctor information is currently mock UI state.
+      // No doctor fields are read or written to Firebase in this branch.
+      return const DoctorDashboardScreen();
+    }
     final l = context.l10n;
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),

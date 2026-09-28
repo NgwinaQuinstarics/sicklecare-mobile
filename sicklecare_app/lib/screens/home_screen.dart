@@ -12,6 +12,7 @@ import 'weather_screen.dart';
 import 'support_screen.dart';
 import 'settings/settings_screen.dart';
 import 'admin/admin_screen.dart';
+import 'care/care_hub_screen.dart';
 
 /// Home dashboard tab: greeting + today's snapshot (hydration, pain, next
 /// reminder) + quick actions + secondary "explore" shortcuts.
@@ -79,7 +80,10 @@ class DashboardScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(firstName == null ? l.helloNoName : l.hello(firstName),
+                      Text(
+                          firstName == null
+                              ? l.helloNoName
+                              : l.hello(firstName),
                           style: tt.headlineSmall),
                       const SizedBox(height: 2),
                       Text(l.formatDayDate(now),
@@ -151,7 +155,10 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             SectionCard(
               gradient: LinearGradient(
-                colors: [cs.primary, Color.lerp(cs.primary, Colors.black, 0.24)!],
+                colors: [
+                  cs.primary,
+                  Color.lerp(cs.primary, Colors.black, 0.24)!
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -207,6 +214,18 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             Text(l.explore, style: tt.titleMedium),
             const SizedBox(height: 12),
+            _ExploreTile(
+              icon: Icons.health_and_safety_outlined,
+              title: l.tr('My care hub', 'Mon espace santé'),
+              subtitle: l.tr(
+                'Health profile, medication, crisis and emergency tools',
+                'Profil santé, médicaments, crises et outils d’urgence',
+              ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CareHubScreen()),
+              ),
+            ),
+            const SizedBox(height: 10),
             _ExploreTile(
               icon: Icons.local_drink_outlined,
               title: l.hydrationDiet,
@@ -326,7 +345,15 @@ class _PainCard extends StatelessWidget {
     final p = pain;
     final emoji = p == null
         ? '🙂'
-        : (p <= 2 ? '😀' : p <= 4 ? '🙂' : p <= 6 ? '😐' : p <= 8 ? '😕' : '😣');
+        : (p <= 2
+            ? '😀'
+            : p <= 4
+                ? '🙂'
+                : p <= 6
+                    ? '😐'
+                    : p <= 8
+                        ? '😕'
+                        : '😣');
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,8 +443,8 @@ class _ExploreTile extends StatelessWidget {
                         tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(subtitle,
-                    style: TextStyle(
-                        color: cs.onSurfaceVariant, fontSize: 12.5)),
+                    style:
+                        TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5)),
               ],
             ),
           ),

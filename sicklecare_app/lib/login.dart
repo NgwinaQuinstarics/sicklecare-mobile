@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'l10n/strings.dart';
-import 'signup.dart';
+import 'screens/auth/role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,8 +17,16 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
   bool _loading = false;
+  bool _resetLoading = false;
   bool _obscure = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -45,16 +54,22 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = l.enterEmailReset);
       return;
     }
+    setState(() {
+      _resetLoading = true;
+      _error = null;
+    });
     try {
-      await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: _email.text.trim());
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _email.text.trim(),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.resetEmailSent)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.resetEmailSent)));
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _resetLoading = false);
     }
   }
 
@@ -77,19 +92,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Image.asset('assets/AppIcon.png',
-                            width: 84, height: 84, cacheWidth: 240, fit: BoxFit.cover),
+                        child: Image.asset(
+                          'assets/AppIcon.png',
+                          width: 84,
+                          height: 84,
+                          cacheWidth: 240,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(l.welcomeBack,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                            fontSize: 26, fontWeight: FontWeight.w600)),
+                    Text(
+                      l.welcomeBack,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text(l.signInSubtitle,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: cs.onSurfaceVariant)),
+                    Text(
+                      l.signInSubtitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
                     const SizedBox(height: 28),
                     TextFormField(
                       controller: _email,
@@ -109,11 +135,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: l.password,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscure
-                              ? Icons.visibility
-                              : Icons.visibility_off),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          icon: Icon(
+                            _obscure ? Icons.visibility : Icons.visibility_off,
+                          ),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
                       validator: (v) =>
@@ -127,8 +152,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: _resetPassword,
-                        child: Text(l.forgotPassword),
+                        onPressed: _resetLoading ? null : _resetPassword,
+                        child: _resetLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(l.forgotPassword),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -138,8 +171,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : Text(l.signIn),
                     ),
                     const SizedBox(height: 16),
@@ -150,7 +183,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextButton(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                                builder: (_) => const SignupScreen()),
+                              builder: (_) => const RoleSelectionScreen(),
+                            ),
                           ),
                           child: Text(l.signUp),
                         ),
