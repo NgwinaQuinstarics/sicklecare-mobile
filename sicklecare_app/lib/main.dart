@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'l10n/strings.dart';
 import 'providers/auth_provider.dart';
+import 'providers/care_ui_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/tracker_provider.dart';
 import 'providers/reminder_provider.dart';
@@ -66,6 +67,9 @@ class SickleCareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // UI-only mock state for new care pathways. This is intentionally
+        // separate from Firebase until models and data requirements are agreed.
+        ChangeNotifierProvider(create: (_) => CareUiProvider()),
         ChangeNotifierProvider(create: (_) => TrackerProvider()),
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
       ],
