@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import '../l10n/strings.dart';
@@ -11,15 +12,28 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navigationTimer;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2000), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 900), () {
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AuthGate()),
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const AuthGate(),
+          transitionDuration: Duration.zero,
+        ),
+        (route) => false,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _navigationTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -43,30 +57,33 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               const Spacer(),
               ZoomIn(
-                duration: const Duration(milliseconds: 600),
+                duration: const Duration(milliseconds: 420),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
-                  child: Image.asset('assets/AppIcon.png',
-                      width: 116, height: 116, cacheWidth: 320, fit: BoxFit.cover),
+                  child: Image.asset('assets/logo.png',
+                      width: 116,
+                      height: 116,
+                      cacheWidth: 320,
+                      fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: 22),
               FadeInUp(
-                duration: const Duration(milliseconds: 600),
+                duration: const Duration(milliseconds: 420),
                 child: Text('SickleCare',
                     style: text.displaySmall
                         ?.copyWith(fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 6),
               FadeInUp(
-                delay: const Duration(milliseconds: 150),
-                duration: const Duration(milliseconds: 600),
+                delay: const Duration(milliseconds: 90),
+                duration: const Duration(milliseconds: 420),
                 child: Text(context.l10n.appTagline,
                     style: TextStyle(color: cs.onSurfaceVariant)),
               ),
               const SizedBox(height: 34),
               FadeIn(
-                delay: const Duration(milliseconds: 400),
+                delay: const Duration(milliseconds: 180),
                 child: SizedBox(
                   width: 26,
                   height: 26,
@@ -76,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const Spacer(),
               FadeIn(
-                delay: const Duration(milliseconds: 600),
+                delay: const Duration(milliseconds: 260),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(32, 0, 32, 18),
                   child: Text(

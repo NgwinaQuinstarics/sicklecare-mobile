@@ -101,7 +101,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       const SizedBox(height: 8),
                       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: FirebaseFirestore.instance
-                            .collection('contact_messages')
+                            .collection('support_messages')
                             .orderBy('createdAt', descending: true)
                             .limit(20)
                             .snapshots(),

@@ -33,12 +33,19 @@ class Reminder {
         enabled: m['enabled'] ?? true,
       );
 
-  Reminder copyWith({bool? enabled}) => Reminder(
+  Reminder copyWith({
+    String? title,
+    String? body,
+    DateTime? time,
+    bool? repeatDaily,
+    bool? enabled,
+  }) =>
+      Reminder(
         id: id,
-        title: title,
-        body: body,
-        time: time,
-        repeatDaily: repeatDaily,
+        title: title ?? this.title,
+        body: body ?? this.body,
+        time: time ?? this.time,
+        repeatDaily: repeatDaily ?? this.repeatDaily,
         enabled: enabled ?? this.enabled,
       );
 }

@@ -16,24 +16,52 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  late final List<Widget?> _tabs;
 
-  void _go(int i) {
-    if (i != _index) setState(() => _index = i);
+  @override
+  void initState() {
+    super.initState();
+    _tabs = List<Widget?>.filled(5, null)
+      ..[0] = DashboardScreen(onNavigate: _go);
   }
 
-  late final List<Widget> _tabs = [
-    DashboardScreen(onNavigate: _go),
-    const HistoryScreen(),
-    const TrackerScreen(),
-    const RemindersScreen(),
-    const AIChatScreen(),
-  ];
+  void _go(int i) {
+    if (_tabs[i] == null) {
+      _tabs[i] = _buildTab(i);
+    }
+    if (i != _index) {
+      setState(() => _index = i);
+    }
+  }
+
+  Widget _buildTab(int index) {
+    switch (index) {
+      case 0:
+        return DashboardScreen(onNavigate: _go);
+      case 1:
+        return const HistoryScreen();
+      case 2:
+        return const TrackerScreen();
+      case 3:
+        return const RemindersScreen();
+      case 4:
+        return const AIChatScreen();
+      default:
+        return DashboardScreen(onNavigate: _go);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
+      body: IndexedStack(
+        index: _index,
+        children: [
+          for (var i = 0; i < _tabs.length; i++)
+            _tabs[i] ?? const SizedBox.shrink(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _go,

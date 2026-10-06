@@ -25,16 +25,19 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _acceptTerms = false;
   String? _error;
   late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
 
   @override
   void initState() {
     super.initState();
     _termsTap = TapGestureRecognizer()..onTap = _openTerms;
+    _privacyTap = TapGestureRecognizer()..onTap = _openPrivacy;
   }
 
   @override
   void dispose() {
     _termsTap.dispose();
+    _privacyTap.dispose();
     _name.dispose();
     _email.dispose();
     _pass.dispose();
@@ -44,8 +47,23 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _openTerms() async {
     final uri = Uri.parse(AppStrings.termsUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error launching terms URL: $e');
+    }
+  }
+
+  Future<void> _openPrivacy() async {
+    final uri = Uri.parse(AppStrings.privacyUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error launching privacy URL: $e');
     }
   }
 
@@ -65,22 +83,55 @@ class _SignupScreenState extends State<SignupScreen> {
         email: _email.text.trim(),
         password: _pass.text,
       );
-      await cred.user?.updateDisplayName(_name.text.trim());
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .set({
-        'name': _name.text.trim(),
-        'email': _email.text.trim(),
-        'genotype': _genotype.text.trim(),
-        'role': 'user',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      try {
+        await cred.user?.updateDisplayName(_name.text.trim());
+      } catch (e) {
+        debugPrint('updateDisplayName failed (known Pigeon bug): $e');
+      }
+      // Firestore profile creation — non-fatal if rules block it.
+      // The profile will be created/merged on next login via AuthProvider.
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(cred.user!.uid)
+            .set({
+          'name': _name.text.trim(),
+          'email': _email.text.trim(),
+          'genotype': _genotype.text.trim(),
+          'role': 'user',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (firestoreErr) {
+        debugPrint('Firestore profile write failed (non-fatal): $firestoreErr');
+      }
+      // Pop the signup screen so the user automatically lands on MainShell
       if (mounted) Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message);
+      final msg = e.message?.toLowerCase() ?? '';
+      if (e.code == 'network-request-failed' ||
+          msg.contains('failed to connect') ||
+          msg.contains('connection reset') ||
+          msg.contains('socketexception')) {
+        setState(() => _error = context.l10n.networkError);
+      } else {
+        setState(() => _error = e.message);
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final str = e.toString().toLowerCase();
+      if (str.contains('pigeonuserdetails')) {
+        // Known bug in firebase_auth 4.16.0 on Android, but user is actually successfully created.
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
+      if (str.contains('socketexception') ||
+          str.contains('failed to connect') ||
+          str.contains('connection reset') ||
+          str.contains('network') ||
+          str.contains('clientexception')) {
+        setState(() => _error = context.l10n.networkError);
+      } else {
+        setState(() => _error = e.toString());
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -106,7 +157,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
-                        child: Image.asset('assets/AppIcon.png',
+                        child: Image.asset('assets/logo.png',
                             width: 68,
                             height: 68,
                             cacheWidth: 200,
@@ -184,6 +235,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                 decoration: TextDecoration.underline,
                               ),
                               recognizer: _termsTap,
+                            ),
+                            TextSpan(text: l.and),
+                            TextSpan(
+                              text: l.privacyLink,
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                              recognizer: _privacyTap,
                             ),
                           ])),
                         ),
