@@ -5,7 +5,6 @@ import '../../models/app_role.dart';
 import '../../providers/care_ui_provider.dart';
 import '../../signup.dart';
 import '../../widgets/section_card.dart';
-import '../../widgets/status_banner.dart';
 import '../doctor/doctor_registration_screen.dart';
 
 /// Selects a presentation path before onboarding. Warrior signup retains the
@@ -77,13 +76,6 @@ class RoleSelectionScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                StatusBanner(
-                  tone: StatusBannerTone.info,
-                  title: 'Clinician onboarding is a UI preview',
-                  message:
-                      'The warrior option uses the existing account flow. Doctor registration below is presentation-only and does not create or change a Firebase record yet.',
-                ),
                 const SizedBox(height: 22),
                 _RoleOption(
                   icon: Icons.favorite_outline,
@@ -99,8 +91,8 @@ class RoleSelectionScreen extends StatelessWidget {
                   icon: Icons.medical_services_outlined,
                   title: 'I am a healthcare professional',
                   subtitle:
-                      'Preview professional profile, credentials, verification and clinician workspace screens.',
-                  buttonLabel: 'Preview clinician registration',
+                      'Set up your professional profile, credentials, verification and clinician workspace.',
+                  buttonLabel: 'Create clinician profile',
                   accent: const Color(0xFF1976A8),
                   onPressed: () => _openDoctorRegistration(context),
                 ),

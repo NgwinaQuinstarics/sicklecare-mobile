@@ -37,7 +37,7 @@ void main() {
     );
     expect(
       find.text('Clinician onboarding is a UI preview', skipOffstage: false),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -52,8 +52,40 @@ void main() {
     );
   });
 
+  testWidgets('clinician onboarding clears the setup routes on completion',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      previewApp(
+        DoctorRegistrationScreen(onSubmitted: (_) async {}),
+      ),
+    );
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'Dr. Jordan M.');
+    await tester.enterText(fields.at(1), 'jordan@example.test');
+    await tester.enterText(fields.at(2), '+237 600 000 000');
+    await tester.enterText(fields.at(3), 'MD');
+    await tester.enterText(fields.at(4), 'CM-12345');
+    await tester.enterText(fields.at(5), 'Preview Hospital');
+    await tester.enterText(fields.at(6), '5');
+
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.tap(find.text('Create professional profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DoctorDashboardScreen), findsOneWidget);
+    expect(
+      Navigator.of(tester.element(find.byType(DoctorDashboardScreen))).canPop(),
+      isFalse,
+    );
+  });
+
   testWidgets('doctor workspace renders its initial dashboard state',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(375, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final provider = CareUiProvider(autoLoad: false)
       ..updateDoctorProfile(
         const DoctorProfile(
@@ -77,6 +109,7 @@ void main() {
 
     expect(find.text('Care workspace'), findsOneWidget);
     expect(find.textContaining('Dr. Jordan'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('care hub exposes the new warrior health tools', (tester) async {

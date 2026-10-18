@@ -203,7 +203,10 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
               'Professional profile created. Credentials are ready for review.'),
         ),
       );
-      Navigator.of(context).pushReplacement(
+      // Completing onboarding starts a new clinician session. Clearing the
+      // registration stack makes the workspace the root screen, so Android
+      // Back cannot return to role selection and make the user repeat setup.
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => DoctorDashboardScreen(
             doctorName: draft.fullName,
@@ -212,6 +215,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
             verificationStatus: DoctorVerificationStatus.pending,
           ),
         ),
+        (route) => false,
       );
     } catch (_) {
       if (!mounted) return;
@@ -511,23 +515,26 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   SectionCard(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: CheckboxListTile(
-                      value: _credentialsConfirmed,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: const Text(
-                          'I confirm these professional details are accurate.'),
-                      subtitle: Text(
-                        'You will be asked to submit supporting credentials next.',
-                        style: TextStyle(color: cs.onSurfaceVariant),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        value: _credentialsConfirmed,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text(
+                            'I confirm these professional details are accurate.'),
+                        subtitle: Text(
+                          'You will be asked to submit supporting credentials next.',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _credentialsConfirmed = value ?? false;
+                                  _submitError = null;
+                                });
+                              },
                       ),
-                      onChanged: _isSubmitting
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _credentialsConfirmed = value ?? false;
-                                _submitError = null;
-                              });
-                            },
                     ),
                   ),
                   if (_submitError != null) ...[

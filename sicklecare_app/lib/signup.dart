@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'l10n/strings.dart';
 import 'constants/app_strings.dart';
+import 'auth_gate.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -104,8 +105,7 @@ class _SignupScreenState extends State<SignupScreen> {
       } catch (firestoreErr) {
         debugPrint('Firestore profile write failed (non-fatal): $firestoreErr');
       }
-      // Pop the signup screen so the user automatically lands on MainShell
-      if (mounted) Navigator.of(context).pop();
+      _finishSignup();
     } on FirebaseAuthException catch (e) {
       final msg = e.message?.toLowerCase() ?? '';
       if (e.code == 'network-request-failed' ||
@@ -120,7 +120,7 @@ class _SignupScreenState extends State<SignupScreen> {
       final str = e.toString().toLowerCase();
       if (str.contains('pigeonuserdetails')) {
         // Known bug in firebase_auth 4.16.0 on Android, but user is actually successfully created.
-        if (mounted) Navigator.of(context).pop();
+        _finishSignup();
         return;
       }
       if (str.contains('socketexception') ||
@@ -135,6 +135,17 @@ class _SignupScreenState extends State<SignupScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Starts a fresh authenticated navigation stack after account creation.
+  /// This removes the signup and role-selection routes, preventing Back from
+  /// reopening onboarding after the account is already active.
+  void _finishSignup() {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
+    );
   }
 
   @override
@@ -209,8 +220,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           icon: Icon(_obscure
                               ? Icons.visibility
                               : Icons.visibility_off),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
                       validator: (v) =>
@@ -261,8 +271,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : Text(l.createAccount),
                     ),
                   ],

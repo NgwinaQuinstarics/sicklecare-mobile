@@ -253,7 +253,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
-                        childAspectRatio: columns == 4 ? 1.05 : 1.18,
+                        // Metric cards include an icon, a large value and two
+                        // supporting lines. A fixed extent prevents a narrow
+                        // phone from making their height depend on width and
+                        // clipping the final helper line.
+                        mainAxisExtent: columns == 4 ? 180 : 184,
                         children: [
                           DoctorMetricCard(
                             label: 'Today’s sessions',

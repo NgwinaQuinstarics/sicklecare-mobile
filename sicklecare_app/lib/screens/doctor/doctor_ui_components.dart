@@ -314,6 +314,8 @@ class DoctorMetricCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               helper!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(color: accent, fontSize: 11.5),
             ),
           ],
