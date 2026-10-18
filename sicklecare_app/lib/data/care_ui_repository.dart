@@ -32,7 +32,9 @@ abstract class CareUiRepository {
 }
 
 /// Deliberately fictional, in-memory data for building and testing UI flows.
-/// It contains no Firebase calls, patient records, or production facility data.
+/// It contains no Firebase calls, patient records, prescriptions, or production
+/// facility data. Keep values visibly synthetic so preview screens cannot be
+/// mistaken for a real person's health record or a real care directory.
 class MockCareUiRepository implements CareUiRepository {
   const MockCareUiRepository();
 
@@ -43,12 +45,12 @@ class MockCareUiRepository implements CareUiRepository {
     return CareUiData(
       doctorProfile: DoctorProfile(
         id: 'mock-doctor-1',
-        fullName: 'Dr. Eliane M.',
+        fullName: 'Dr. N. Preview',
         specialty: 'Clinical haematology',
         qualifications: const ['MD', 'Clinical Haematology Fellowship'],
-        facilityName: 'SickleCare Community Hospital',
+        facilityName: 'SickleCare Preview Hospital',
         city: 'Douala',
-        email: 'eliane.m@example.test',
+        email: 'clinician.preview@example.test',
         phoneNumber: '+237 6 00 00 00 10',
         availabilitySummary: 'Mon–Fri · 08:00–16:00',
         isAvailable: true,
@@ -73,27 +75,27 @@ class MockCareUiRepository implements CareUiRepository {
       ),
       warriorProfile: const WarriorHealthProfile(
         id: 'mock-warrior-1',
-        displayName: 'Amina',
-        bloodGroup: 'O+',
-        genotype: 'HbSS',
-        primaryFacilityName: 'SickleCare Community Hospital',
-        primaryDoctorName: 'Dr. Eliane M.',
+        displayName: 'Preview warrior',
+        bloodGroup: 'Not set',
+        genotype: 'Not set',
+        primaryFacilityName: 'SickleCare Preview Hospital',
+        primaryDoctorName: 'Dr. N. Preview',
         emergencyContact: EmergencyContact(
           id: 'mock-emergency-contact-1',
-          name: 'Grace A.',
-          relationship: 'Parent',
+          name: 'Trusted contact',
+          relationship: 'Preview contact',
           phoneNumber: '+237 6 00 00 00 20',
         ),
-        allergies: ['No known allergies recorded'],
-        knownTriggers: ['Dehydration', 'Cold weather', 'Stress'],
+        allergies: ['Not set in preview'],
+        knownTriggers: ['Preview item'],
         careNotes:
-            'Mock health information for UI preview only. Confirm care steps with a clinician.',
+            'Preview-only health information. Confirm care steps with a clinician.',
         hydrationGoalMl: 2500,
       ),
       facilities: const [
         HealthcareFacility(
           id: 'mock-facility-community-hospital',
-          name: 'SickleCare Community Hospital',
+          name: 'SickleCare Preview Hospital',
           type: FacilityType.hospital,
           address: '12 Wellness Avenue, Akwa',
           city: 'Douala',
@@ -127,7 +129,7 @@ class MockCareUiRepository implements CareUiRepository {
         ),
         HealthcareFacility(
           id: 'mock-facility-bonaberi-clinic',
-          name: 'Bonabéri Family Clinic',
+          name: 'SickleCare Preview Clinic',
           type: FacilityType.clinic,
           address: '4 Riverside Road, Bonabéri',
           city: 'Douala',
@@ -154,7 +156,7 @@ class MockCareUiRepository implements CareUiRepository {
         ),
         HealthcareFacility(
           id: 'mock-facility-akwa-health-centre',
-          name: 'Akwa Health Centre',
+          name: 'SickleCare Preview Health Centre',
           type: FacilityType.healthCenter,
           address: '25 Unity Street, Akwa',
           city: 'Douala',
@@ -184,19 +186,19 @@ class MockCareUiRepository implements CareUiRepository {
       ],
       medications: [
         MedicationPlan(
-          id: 'mock-medication-hydroxyurea',
-          name: 'Hydroxyurea',
-          dosage: '500 mg',
-          scheduleLabel: 'Every morning',
+          id: 'mock-medication-morning',
+          name: 'Morning medicine',
+          dosage: 'Use your prescribed dose',
+          scheduleLabel: 'Morning reminder',
           nextDoseAt: DateTime(now.year, now.month, now.day, 8),
           instructions:
-              'Mock reminder only — follow the care plan from a clinician.',
+              'Preview reminder only. Follow the care plan from your clinician.',
         ),
         MedicationPlan(
-          id: 'mock-medication-folic-acid',
-          name: 'Folic acid',
-          dosage: '5 mg',
-          scheduleLabel: 'Every evening',
+          id: 'mock-medication-evening',
+          name: 'Evening medicine',
+          dosage: 'Use your prescribed dose',
+          scheduleLabel: 'Evening reminder',
           nextDoseAt: DateTime(now.year, now.month, now.day, 20),
         ),
       ],

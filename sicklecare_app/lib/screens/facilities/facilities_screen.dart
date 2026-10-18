@@ -387,7 +387,7 @@ class _FacilitiesContent extends StatelessWidget {
                             ),
                           ),
                           if (visibleFacilities.isNotEmpty)
-                            Icon(Icons.sort_by_alpha_outlined,
+                            Icon(Icons.near_me_outlined,
                                 color: cs.onSurfaceVariant),
                         ],
                       ),
@@ -677,7 +677,7 @@ class _FacilityCard extends StatelessWidget {
                   _ServiceChip(label: '+$serviceCount more'),
               ],
             ),
-          const Spacer(),
+          const SizedBox(height: 12),
           const Divider(height: 22),
           Row(
             children: [

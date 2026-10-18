@@ -58,9 +58,6 @@ dependencies:
   geolocator: ^10.1.1
   url_launcher: ^6.3.2
 
-  # ENV
-  flutter_dotenv: ^5.2.1
-
   # Utils
   logger: ^1.4.0
   package_info_plus: ^9.0.1
@@ -86,4 +83,3 @@ flutter:
 
   assets:
     - assets/
-    - .env

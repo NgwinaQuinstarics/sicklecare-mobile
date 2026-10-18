@@ -110,11 +110,11 @@ void main() {
     );
 
     expect(
-      find.text('SickleCare Community Hospital', skipOffstage: false),
+      find.text('SickleCare Preview Hospital', skipOffstage: false),
       findsOneWidget,
     );
     expect(
-      find.text('Bonabéri Family Clinic', skipOffstage: false),
+      find.text('SickleCare Preview Clinic', skipOffstage: false),
       findsOneWidget,
     );
   });
@@ -132,7 +132,7 @@ void main() {
       ),
     );
 
-    expect(find.text('SickleCare Community Hospital'), findsWidgets);
+    expect(find.text('SickleCare Preview Hospital'), findsWidgets);
     expect(
       find.text('Available services', skipOffstage: false),
       findsOneWidget,
@@ -169,7 +169,7 @@ void main() {
     expect(provider.visibleFacilities.length, 3);
     provider.setFacilityTypeFilter(FacilityType.clinic);
     expect(provider.visibleFacilities, hasLength(1));
-    expect(provider.visibleFacilities.single.name, 'Bonabéri Family Clinic');
+    expect(provider.visibleFacilities.single.name, 'SickleCare Preview Clinic');
 
     final before = provider.hydrationTodayMl;
     expect(provider.logHydration(250), isTrue);
