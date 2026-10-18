@@ -63,16 +63,58 @@ class L10n {
   String formatDayDate(DateTime d) {
     const enWd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const frWd = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
-    const enMo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const frMo = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    const enMo = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    const frMo = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.'
+    ];
     final wd = (fr ? frWd : enWd)[d.weekday - 1];
     final mo = (fr ? frMo : enMo)[d.month - 1];
     return '$wd ${d.day} $mo';
   }
 
   String dayName(int weekday) {
-    const en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const frd = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    const en = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const frd = [
+      'Lundi',
+      'Mardi',
+      'Mercredi',
+      'Jeudi',
+      'Vendredi',
+      'Samedi',
+      'Dimanche'
+    ];
     return (fr ? frd : en)[weekday - 1];
   }
 
@@ -80,16 +122,21 @@ class L10n {
   String get welcomeBack => tr('Welcome back', 'Bon retour');
   String get signInSubtitle => tr('Sign in to your SickleCare account',
       'Connecte-toi à ton compte SickleCare');
-  String get forgotPassword =>
-      tr('Forgot password?', 'Mot de passe oublié ?');
+  String get forgotPassword => tr('Forgot password?', 'Mot de passe oublié ?');
   String get signIn => tr('Sign in', 'Se connecter');
   String get noAccount => tr("Don't have an account?", 'Pas de compte ?');
   String get signUp => tr('Sign up', "S'inscrire");
   String get enterEmailReset => tr('Enter your email to reset password',
       'Entre ton e-mail pour réinitialiser le mot de passe');
-  String get resetEmailSent => tr('Password reset email sent',
-      'E-mail de réinitialisation envoyé');
+  String get resetEmailSent =>
+      tr('Password reset email sent', 'E-mail de réinitialisation envoyé');
+  String get resetEmailSentWithSpamHint => tr(
+      'Password reset email sent. Check your inbox or Spam folder.',
+      'E-mail de réinitialisation envoyé. Vérifie ta boîte de réception ou le dossier spam.');
   String get loginFailed => tr('Login failed', 'Échec de la connexion');
+  String get networkError => tr(
+      'Network error. Please check your internet connection or disable your VPN and try again.',
+      "Erreur de connexion. Veuillez vérifier votre connexion Internet ou désactiver votre VPN, puis réessayer.");
   String get createAccount => tr('Create account', 'Créer un compte');
   String get joinSickleCare => tr('Join SickleCare', 'Rejoins SickleCare');
   String get genotypeHint =>
@@ -148,8 +195,7 @@ class L10n {
   String get snack => tr('Snack', 'Collation');
   String get editMenu => tr('Edit', 'Modifier');
   String get menuSaved => tr('Menu updated', 'Menu mis à jour');
-  String get resetWeekMenu =>
-      tr('Reset this week', 'Réinitialiser la semaine');
+  String get resetWeekMenu => tr('Reset this week', 'Réinitialiser la semaine');
   String get menuReset => tr('Menu reset', 'Menu réinitialisé');
   String get editDayMenu => tr('Edit the day', 'Modifier la journée');
   String get hydrationGoals =>
@@ -206,8 +252,8 @@ class L10n {
       'En cas de douleur intense, douleur à la poitrine, difficulté à respirer ou fièvre — consulte immédiatement.');
   String get callEmergency =>
       tr('Call emergency (112)', 'Appeler les urgences (112)');
-  String get contactTeam => tr('Contact the SickleCare team',
-      "Contacter l'équipe SickleCare");
+  String get contactTeam =>
+      tr('Contact the SickleCare team', "Contacter l'équipe SickleCare");
   String get name => tr('Name', 'Nom');
   String get subject => tr('Subject', 'Sujet');
   String get message => tr('Message', 'Message');
@@ -270,7 +316,8 @@ class L10n {
 
   // ---- Sika (AI assistant) ----
   String get assistantTitle => 'Sika';
-  String get askAnything => tr('Ask Sika anything…', 'Pose ta question à Sika…');
+  String get askAnything =>
+      tr('Ask Sika anything…', 'Pose ta question à Sika…');
   String get aiIntro => tr(
       "Hi, I'm Sika, your SickleCare assistant. Ask me about hydration, pain, nutrition, reminders — anything about daily sickle-cell care.",
       "Bonjour, je suis Sika, ton assistant SickleCare. Pose-moi tes questions sur l'hydratation, la douleur, la nutrition, les rappels — tout sur les soins au quotidien.");
@@ -305,8 +352,7 @@ class L10n {
   String get humidity => tr('Humidity', 'Humidité');
   String get wind => tr('Wind', 'Vent');
   String get todaysTip => tr("Today's tip", 'Conseil du jour');
-  String get openAppSettings =>
-      tr('Open app settings', 'Ouvrir les réglages');
+  String get openAppSettings => tr('Open app settings', 'Ouvrir les réglages');
   String get adviceCold => tr(
       'Cold day — dress warmly in layers. Cold can trigger pain crises.',
       'Journée fraîche — couvre-toi en plusieurs couches. Le froid peut déclencher une crise.');
@@ -343,12 +389,23 @@ class L10n {
     }
   }
 
+  // ---- Alarm ----
+  String get alarmRinging => tr('Alarm ringing!', 'Alarme en cours !');
+  String get stopAlarm => tr('Stop alarm', "Arrêter l'alarme");
+  String get alarmFor => tr('Alarm for:', 'Alarme pour :');
+  String get alarmStopped => tr('Alarm stopped', 'Alarme arrêtée');
+  String get medicationTime =>
+      tr('Time for your reminder', "C'est l'heure de votre rappel");
+
   // ---- Voice / export / terms ----
   String get exportPdf => tr('Export to PDF', 'Exporter en PDF');
   String get listening => tr('Listening…', 'Écoute…');
   String get readAloud => tr('Read aloud', 'Lire à voix haute');
   String get acceptTermsPrefix => tr('I accept the ', "J'accepte les ");
   String get termsLink => tr('Terms & Conditions', "conditions d'utilisation");
+  String get and => tr(' and ', " et la ");
+  String get privacyLink =>
+      tr('Privacy Policy', "politique de confidentialité");
 }
 
 extension L10nContext on BuildContext {

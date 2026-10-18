@@ -1,0 +1,231 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // HELPER FUNCTIONS
+    // =========================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+             request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return signedIn() &&
+             request.auth.uid == userId;
+    }
+
+    function validTrackerEntry() {
+      return request.resource.data.keys().hasOnly([
+               'id', 'date', 'painLevel', 'hydrationMl', 'mood', 'notes'
+             ]) &&
+             request.resource.data.id is string &&
+             request.resource.data.date is string &&
+             request.resource.data.painLevel is int &&
+             request.resource.data.painLevel >= 0 &&
+             request.resource.data.painLevel <= 10 &&
+             request.resource.data.hydrationMl is int &&
+             request.resource.data.hydrationMl >= 0 &&
+             request.resource.data.hydrationMl <= 10000 &&
+             request.resource.data.mood is string &&
+             request.resource.data.mood.size() <= 8 &&
+             request.resource.data.notes is string &&
+             request.resource.data.notes.size() <= 2000;
+    }
+
+    function validContactPayload() {
+      return request.resource.data.keys().hasOnly([
+               'name', 'email', 'subject', 'message', 'status', 'source',
+               'createdAt'
+             ]) &&
+             request.resource.data.name is string &&
+             request.resource.data.name.size() > 0 &&
+             request.resource.data.name.size() <= 120 &&
+             request.resource.data.email is string &&
+             request.resource.data.email.size() <= 160 &&
+             request.resource.data.subject is string &&
+             request.resource.data.subject.size() <= 160 &&
+             request.resource.data.message is string &&
+             request.resource.data.message.size() > 0 &&
+             request.resource.data.message.size() <= 2500 &&
+             request.resource.data.status == 'new' &&
+             request.resource.data.source == 'mobile_support' &&
+             request.resource.data.createdAt == request.time;
+    }
+
+    function validSupportPayload() {
+      return request.resource.data.keys().hasOnly([
+               'name', 'email', 'subject', 'message', 'status', 'source',
+               'createdAt', 'uid', 'userEmail', 'userName'
+             ]) &&
+             request.resource.data.uid == request.auth.uid &&
+             request.resource.data.name is string &&
+             request.resource.data.name.size() > 0 &&
+             request.resource.data.name.size() <= 120 &&
+             request.resource.data.email is string &&
+             request.resource.data.email.size() <= 160 &&
+             request.resource.data.subject is string &&
+             request.resource.data.subject.size() <= 160 &&
+             request.resource.data.message is string &&
+             request.resource.data.message.size() > 0 &&
+             request.resource.data.message.size() <= 2500 &&
+             request.resource.data.status == 'new' &&
+             request.resource.data.source == 'mobile_support' &&
+             request.resource.data.createdAt == request.time;
+    }
+
+    // =========================
+    // USERS
+    // =========================
+
+    match /users/{userId} {
+
+      // Users can read/update their own profile
+      // Admin can manage all users
+      allow read, update: if isOwner(userId) || isAdmin();
+
+      // Users can create their own profile during signup
+      allow create: if isOwner(userId) || isAdmin();
+
+      // Only admins can delete users
+      allow delete: if isAdmin();
+
+      match /tracker_entries/{entryId} {
+        allow read, delete: if isOwner(userId) || isAdmin();
+        allow create, update:
+          if (isOwner(userId) && validTrackerEntry()) || isAdmin();
+      }
+
+      // Other user subcollections are admin-only until explicitly supported.
+      match /{document=**} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // =========================
+    // CONTACT FORM
+    // =========================
+
+    match /contacts/{contactId} {
+
+      // Anyone can submit a bounded public contact payload
+      allow create: if validContactPayload();
+
+      // Only admin can view/manage
+      allow read, update, delete: if isAdmin();
+    }
+
+    // =========================
+    // FEEDBACK
+    // =========================
+
+    match /feedback/{feedbackId} {
+
+      // Anyone can submit feedback
+      allow create: if true;
+
+      // Only admin can view/manage
+      allow read, update, delete: if isAdmin();
+    }
+
+    // =========================
+    // SUPPORT MESSAGES
+    // =========================
+
+    match /support_messages/{messageId} {
+
+      // Logged-in users can submit bounded support payloads
+      allow create: if signedIn() && validSupportPayload();
+
+      // Admin manages all messages
+      allow read, update, delete: if isAdmin();
+    }
+
+    // =========================
+    // FAQS
+    // =========================
+
+    match /faqs/{faqId} {
+
+      // Public can only see published FAQs
+      allow get, list:
+        if resource.data.published == true
+        || isAdmin();
+
+      // Admin manages FAQs
+      allow create, update, delete:
+        if isAdmin();
+    }
+
+    // =========================
+    // RESOURCES
+    // =========================
+
+    match /resources/{resourceId} {
+
+      // Public sees published resources
+      allow get, list:
+        if resource.data.published == true
+        || isAdmin();
+
+      // Admin manages resources
+      allow create, update, delete:
+        if isAdmin();
+    }
+
+    // =========================
+    // APP CONTENT
+    // =========================
+
+    match /content/{contentId} {
+
+      // Everyone can read
+      allow get, list: if true;
+
+      // Admin manages
+      allow create, update, delete:
+        if isAdmin();
+    }
+
+    // =========================
+    // APP SETTINGS
+    // =========================
+
+    match /settings/{settingId} {
+
+      // Readable by everyone
+      allow get, list: if true;
+
+      // Only admin can edit
+      allow create, update, delete:
+        if isAdmin();
+    }
+
+    // =========================
+    // NOTIFICATIONS
+    // =========================
+
+    match /notifications/{notificationId} {
+
+      allow read:
+        if signedIn();
+
+      allow create, update, delete:
+        if isAdmin();
+    }
+
+    // =========================
+    // DEFAULT DENY
+    // =========================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

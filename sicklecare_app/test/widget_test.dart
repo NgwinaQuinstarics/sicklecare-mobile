@@ -11,8 +11,8 @@ import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_registration_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_verification_status_screen.dart';
-import 'package:sicklecare_app/screens/facilities/facility_detail_screen.dart';
 import 'package:sicklecare_app/screens/facilities/facilities_screen.dart';
+import 'package:sicklecare_app/screens/facilities/facility_detail_screen.dart';
 import 'package:sicklecare_app/theme/app_theme.dart';
 
 Widget previewApp(Widget child, {CareUiProvider? provider}) {
@@ -47,7 +47,9 @@ void main() {
 
     expect(find.text('Create clinician profile'), findsOneWidget);
     expect(
-        find.text('Professional details', skipOffstage: false), findsOneWidget);
+      find.text('Professional details', skipOffstage: false),
+      findsOneWidget,
+    );
   });
 
   testWidgets('doctor workspace renders its initial dashboard state',
@@ -83,7 +85,9 @@ void main() {
 
     expect(find.text('Health profile', skipOffstage: false), findsOneWidget);
     expect(
-        find.text('Pain crisis tracker', skipOffstage: false), findsOneWidget);
+      find.text('Pain crisis tracker', skipOffstage: false),
+      findsOneWidget,
+    );
     expect(
       find.text('Medicines & hydration', skipOffstage: false),
       findsOneWidget,
@@ -130,7 +134,9 @@ void main() {
 
     expect(find.text('SickleCare Community Hospital'), findsWidgets);
     expect(
-        find.text('Available services', skipOffstage: false), findsOneWidget);
+      find.text('Available services', skipOffstage: false),
+      findsOneWidget,
+    );
     expect(find.text('Contact & hours', skipOffstage: false), findsOneWidget);
   });
 

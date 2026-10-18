@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'l10n/strings.dart';
@@ -40,9 +41,26 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _pass.text,
       );
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? context.l10n.loginFailed);
+      final msg = e.message?.toLowerCase() ?? '';
+      if (e.code == 'network-request-failed' ||
+          msg.contains('failed to connect') ||
+          msg.contains('connection reset') ||
+          msg.contains('socketexception')) {
+        setState(() => _error = context.l10n.networkError);
+      } else {
+        setState(() => _error = e.message ?? context.l10n.loginFailed);
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final str = e.toString().toLowerCase();
+      if (str.contains('socketexception') ||
+          str.contains('failed to connect') ||
+          str.contains('connection reset') ||
+          str.contains('network') ||
+          str.contains('clientexception')) {
+        setState(() => _error = context.l10n.networkError);
+      } else {
+        setState(() => _error = e.toString());
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,12 +77,22 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _email.text.trim(),
-      );
+      final email = _email.text.trim();
+      try {
+        await FirebaseFunctions.instance
+            .httpsCallable('requestPasswordReset')
+            .call({'email': email});
+      } catch (e) {
+        debugPrint('Custom reset email failed, falling back to Firebase: $e');
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l.resetEmailSent)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.resetEmailSentWithSpamHint),
+            duration: const Duration(seconds: 6),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -93,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: Image.asset(
-                          'assets/AppIcon.png',
+                          'assets/logo.png',
                           width: 84,
                           height: 84,
                           cacheWidth: 240,
@@ -136,7 +164,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscure ? Icons.visibility : Icons.visibility_off,
+                            _obscure
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                           ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
