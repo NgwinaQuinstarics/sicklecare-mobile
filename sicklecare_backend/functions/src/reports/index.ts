@@ -263,9 +263,10 @@ function generateRecommendations(avgPain: number, avgHydration: number): string[
 }
 
 /**
- * Helper function to generate HTML for email
+ * Helper function to generate HTML for email (currently unused - kept for future implementation)
  */
-function generateReportHTML(report: any): string {
+/*
+function _generateReportHTML(report: any): string {
   return `
     <html>
       <body style="font-family: Arial, sans-serif;">
@@ -289,6 +290,7 @@ function generateReportHTML(report: any): string {
     </html>
   `;
 }
+*/
 
 /**
  * Export report functions

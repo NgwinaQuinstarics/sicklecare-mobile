@@ -62,7 +62,7 @@ export const api = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    const { action, data } = req.body;
+    const { action } = req.body;
     
     switch (action) {
       case 'health-check':

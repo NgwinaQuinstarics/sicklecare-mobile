@@ -87,7 +87,7 @@ export const exportHealthData = functions.https.onCall(async (data, context) => 
   try {
     // Fetch health data
     const healthRef = db.collection('users').doc(userId).collection('health');
-    let query = healthRef;
+    let query: FirebaseFirestore.Query = healthRef;
 
     if (startDate && endDate) {
       query = query

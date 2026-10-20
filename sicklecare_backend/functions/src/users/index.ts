@@ -2,7 +2,6 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
 const db = admin.firestore();
-const auth = admin.auth();
 
 /**
  * User Management Functions
@@ -57,7 +56,9 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
     console.log(`User profile created for: ${user.uid}`);
     
     // Send welcome email
-    await sendWelcomeEmail(user.email, user.displayName);
+    if (user.email) {
+      await sendWelcomeEmail(user.email, user.displayName);
+    }
     
     return null;
   } catch (error) {
@@ -194,7 +195,7 @@ async function deleteQueryBatch(
 /**
  * Send welcome email to new users
  */
-async function sendWelcomeEmail(email: string | null, name: string | null): Promise<void> {
+async function sendWelcomeEmail(email: string, name: string | null | undefined): Promise<void> {
   if (!email) return;
 
   // In a real implementation, use an email service like SendGrid

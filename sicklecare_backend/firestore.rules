@@ -42,7 +42,7 @@ service cloud.firestore {
         && request.resource.data.painLevel is number
         && request.resource.data.painLevel >= 0
         && request.resource.data.painLevel <= 10
-        && request.resource.data.meals is list
+        && (!('meals' in request.resource.data) || request.resource.data.meals is list)
         && request.resource.data.timestamp is timestamp;
     }
     
@@ -80,7 +80,7 @@ service cloud.firestore {
     match /support/{ticketId} {
       allow read: if isSignedIn() && (
         // Users can read their own tickets
-        request.resource.data.userId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
         // Admins can read all tickets
         isAdmin() ||
         // Support staff can read tickets
@@ -120,14 +120,16 @@ service cloud.firestore {
       allow write: if isAdmin() || request.auth.token.system == true;
     }
     
-    // Rate limiting: Max 100 writes per minute per user
-    function rateLimit() {
-      return request.time > resource.data.lastWrite.toMillis() + 60000;
+    // Rate limiting: Prevent excessive writes (simple time-based check)
+    function canWrite() {
+      // Allow writes if no previous write exists OR last write was > 60 seconds ago
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid)/health/$(request.resource.id)) || 
+             request.time > resource.data.timestamp.toMillis() + 60000;
     }
     
     // Apply rate limiting to health data writes
     match /users/{userId}/health/{date} {
-      allow write: if isSignedIn() && isUser(userId) && rateLimit();
+      allow write: if isSignedIn() && isUser(userId) && canWrite();
     }
   }
 }
