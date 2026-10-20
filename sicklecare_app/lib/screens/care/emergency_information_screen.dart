@@ -7,6 +7,7 @@ import '../../models/warrior_health_profile.dart';
 import '../../providers/care_ui_provider.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
+import '../facilities/facilities_screen.dart';
 
 /// A concise emergency information card. The medical values shown are mock
 /// data and it deliberately routes urgent needs to local emergency services.
@@ -33,6 +34,32 @@ class _EmergencyInformationScreenState
   void _showUnavailable(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _openEmergencyFacilities() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Consumer<CareUiProvider>(
+          builder: (context, care, _) {
+            final viewState = care.isLoading && !care.hasLoaded
+                ? FacilitiesViewState.loading
+                : !care.hasLoaded && care.errorMessage != null
+                    ? FacilitiesViewState.error
+                    : FacilitiesViewState.content;
+            return FacilitiesScreen(
+              facilities: care.facilities,
+              viewState: viewState,
+              errorMessage: care.errorMessage,
+              initialEmergencyOnly: true,
+              locationLabel: 'Emergency care · preview area',
+              onRetry: care.retry,
+              onRefresh: () => care.load(force: true),
+              onFacilitySelected: care.selectFacility,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _editContact(EmergencyContact contact) async {
@@ -102,7 +129,8 @@ class _EmergencyInformationScreenState
                   controller: alternate,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                      labelText: 'Alternative phone (optional)'),
+                    labelText: 'Alternative phone (optional)',
+                  ),
                 ),
                 const SizedBox(height: 18),
                 FilledButton(
@@ -138,14 +166,57 @@ class _EmergencyInformationScreenState
       context.read<CareUiProvider>().updateEmergencyContact(updated);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Emergency contact updated in this preview.')),
+          content: Text('Emergency contact updated in this preview.'),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<CareUiProvider>().warriorProfile;
+    final care = context.watch<CareUiProvider>();
+    if (!care.hasLoaded && care.errorMessage != null) {
+      final cs = Theme.of(context).colorScheme;
+      return Scaffold(
+        appBar: AppBar(title: const Text('Emergency information')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                StatusBanner(
+                  tone: StatusBannerTone.error,
+                  title: 'Emergency preview unavailable',
+                  message: care.errorMessage!,
+                  action: TextButton.icon(
+                    onPressed: care.retry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: cs.error,
+                    foregroundColor: cs.onError,
+                  ),
+                  onPressed: () => _call(
+                    AppStrings.emergencyHotline,
+                    'Emergency calling is unavailable on this device.',
+                  ),
+                  icon: const Icon(Icons.call_outlined),
+                  label: const Text('Call emergency services (112)'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final profile = care.warriorProfile;
     if (profile == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -159,6 +230,7 @@ class _EmergencyInformationScreenState
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 700),
             child: ListView(
+              key: const Key('emergency-information-list'),
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
               children: [
                 StatusBanner(
@@ -206,6 +278,46 @@ class _EmergencyInformationScreenState
                         ),
                         icon: const Icon(Icons.call_outlined),
                         label: const Text('Call emergency services (112)'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.local_hospital_outlined,
+                            color: cs.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Find emergency-capable care',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Browse preview facilities marked for emergency care. Confirm availability directly with the facility; this directory does not replace calling emergency services.',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: _openEmergencyFacilities,
+                        icon: const Icon(Icons.search_outlined),
+                        label: const Text('Find emergency-capable care'),
                       ),
                     ],
                   ),

@@ -410,6 +410,110 @@ void main() {
     expect(find.text('Emergency card', skipOffstage: false), findsOneWidget);
   });
 
+  testWidgets('emergency information opens prefiltered emergency care',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        const EmergencyInformationScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await tester.drag(
+      find.byKey(const Key('emergency-information-list')),
+      const Offset(0, -700),
+    );
+    await tester.pumpAndSettle();
+    final findEmergencyCareButton = find.widgetWithText(
+      OutlinedButton,
+      'Find emergency-capable care',
+    );
+    await tester.ensureVisible(findEmergencyCareButton);
+    await tester.pumpAndSettle();
+    await tester.tap(findEmergencyCareButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Find care'), findsOneWidget);
+    expect(find.text('Emergency care'), findsWidgets);
+    expect(find.text('SickleCare Preview Hospital'), findsOneWidget);
+    expect(find.text('SickleCare Preview Clinic'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('emergency care directory handles loading, error and retry',
+      (tester) async {
+    final fixture = await const MockCareUiRepository().load();
+    final repository = _ControlledCareUiRepository();
+    final provider = CareUiProvider(repository: repository, autoLoad: false)
+      ..updateWarriorProfile(fixture.warriorProfile);
+    final firstLoad = provider.load();
+
+    await tester.pumpWidget(
+      previewApp(const EmergencyInformationScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('emergency-information-list')),
+      const Offset(0, -400),
+    );
+    await tester.pumpAndSettle();
+    final findEmergencyCareButton = find.widgetWithText(
+      OutlinedButton,
+      'Find emergency-capable care',
+    );
+    await tester.ensureVisible(findEmergencyCareButton);
+    await tester.pumpAndSettle();
+    await tester.tap(findEmergencyCareButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Finding care near you…'), findsOneWidget);
+    expect(repository.requests, hasLength(1));
+
+    repository.requests.single.completeError(StateError('Preview failure'));
+    await firstLoad;
+    await tester.pumpAndSettle();
+    expect(find.text('Facilities are unavailable'), findsOneWidget);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    expect(find.text('Finding care near you…'), findsOneWidget);
+    expect(repository.requests, hasLength(2));
+
+    repository.requests.last.complete(fixture);
+    await tester.pumpAndSettle();
+    expect(find.text('SickleCare Preview Hospital'), findsOneWidget);
+    expect(find.text('SickleCare Preview Clinic'), findsNothing);
+  });
+
+  testWidgets('emergency hotline remains available when preview data fails',
+      (tester) async {
+    final repository = _ControlledCareUiRepository();
+    final provider = CareUiProvider(repository: repository, autoLoad: false);
+    final load = provider.load();
+
+    await tester.pumpWidget(
+      previewApp(const EmergencyInformationScreen(), provider: provider),
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    repository.requests.single.completeError(StateError('Preview failure'));
+    await load;
+    await tester.pumpAndSettle();
+
+    expect(find.text('Emergency preview unavailable'), findsOneWidget);
+    expect(find.text('Call emergency services (112)'), findsOneWidget);
+  });
+
   test('mock care provider filters facilities and updates hydration', () async {
     final provider = CareUiProvider(autoLoad: false);
     await provider.load();

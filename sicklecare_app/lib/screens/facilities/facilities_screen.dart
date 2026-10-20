@@ -23,6 +23,7 @@ class FacilitiesScreen extends StatefulWidget {
   final Future<void> Function()? onRefresh;
   final VoidCallback? onUseCurrentLocation;
   final ValueChanged<HealthcareFacility>? onFacilitySelected;
+  final bool initialEmergencyOnly;
 
   const FacilitiesScreen({
     super.key,
@@ -34,6 +35,7 @@ class FacilitiesScreen extends StatefulWidget {
     this.onRefresh,
     this.onUseCurrentLocation,
     this.onFacilitySelected,
+    this.initialEmergencyOnly = false,
   });
 
   @override
@@ -47,6 +49,12 @@ class _FacilitiesScreenState extends State<FacilitiesScreen> {
   String? _serviceId;
   bool _openNowOnly = false;
   bool _emergencyOnly = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emergencyOnly = widget.initialEmergencyOnly;
+  }
 
   @override
   void dispose() {
@@ -458,9 +466,23 @@ class _LocationCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return SectionCard(
       padding: const EdgeInsets.all(17),
-      child: Row(
-        children: [
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final locationDetails = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Showing care near',
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                locationLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: cs.onSurfaceVariant),
+              ),
+            ],
+          );
+          final locationIcon = Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
@@ -468,29 +490,42 @@ class _LocationCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(Icons.location_on_outlined, color: cs.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+          );
+          final locationAction = TextButton.icon(
+            onPressed: onUseCurrentLocation,
+            icon: const Icon(Icons.my_location_outlined, size: 18),
+            label: const Text('Use my location'),
+          );
+
+          if (constraints.maxWidth < 360) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Showing care near',
-                    style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 2),
-                Text(
-                  locationLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: cs.onSurfaceVariant),
+                Row(
+                  children: [
+                    locationIcon,
+                    const SizedBox(width: 12),
+                    Expanded(child: locationDetails),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: locationAction,
                 ),
               ],
-            ),
-          ),
-          TextButton(
-            onPressed: onUseCurrentLocation,
-            child: const Text('Use my location'),
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              locationIcon,
+              const SizedBox(width: 12),
+              Expanded(child: locationDetails),
+              locationAction,
+            ],
+          );
+        },
       ),
     );
   }
