@@ -13,6 +13,7 @@ import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_registration_screen.dart';
+import 'package:sicklecare_app/screens/doctor/doctor_schedule_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_verification_status_screen.dart';
 import 'package:sicklecare_app/screens/facilities/facilities_screen.dart';
 import 'package:sicklecare_app/screens/facilities/facility_detail_screen.dart';
@@ -199,6 +200,8 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.text('Today’s sessions'));
+    await tester.pumpAndSettle();
     expect(find.text('Today’s sessions'), findsOneWidget);
     expect(find.text('Care-plan reviews'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -224,6 +227,66 @@ void main() {
 
     expect(find.text('Find care'), findsOneWidget);
     expect(find.text('SickleCare Preview Hospital'), findsOneWidget);
+  });
+
+  testWidgets('doctor dashboard opens an interactive schedule', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+
+    await tester.pumpWidget(
+      previewApp(
+        const DoctorDashboardScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Today’s sessions'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('Today’s sessions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Today’s sessions'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DoctorScheduleScreen), findsOneWidget);
+    await tester.tap(find.text('Thu'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('No sessions on this day'),
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('doctor-schedule-list')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    expect(find.text('No sessions on this day'), findsOneWidget);
+
+    await tester.fling(
+      find.byKey(const Key('doctor-schedule-list')),
+      const Offset(0, 1000),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mon'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('New consultation'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('New consultation'), findsOneWidget);
+    await tester.tap(find.text('New consultation'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mark complete in preview'), findsOneWidget);
+    await tester.tap(find.text('Mark complete in preview'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Complete'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('care directory updates from loading and retry states',

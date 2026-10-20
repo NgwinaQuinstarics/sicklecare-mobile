@@ -8,6 +8,7 @@ import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
 import 'credential_submission_screen.dart';
 import 'doctor_profile_screen.dart';
+import 'doctor_schedule_screen.dart';
 import 'doctor_ui_components.dart';
 import 'doctor_verification_status_screen.dart';
 import '../facilities/facilities_screen.dart';
@@ -56,10 +57,9 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       callback();
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Appointment management will appear here when connected.'),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const DoctorScheduleScreen(),
       ),
     );
   }
@@ -392,6 +392,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                           )
                         : SectionCard(
                             key: const ValueKey('schedule'),
+                            onTap: _openAppointments,
                             padding: const EdgeInsets.all(8),
                             child: Column(
                               children: const [
