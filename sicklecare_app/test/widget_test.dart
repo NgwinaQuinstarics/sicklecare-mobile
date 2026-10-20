@@ -337,7 +337,7 @@ void main() {
 
     expect(find.text('Health profile', skipOffstage: false), findsOneWidget);
     expect(
-      find.text('Pain crisis tracker', skipOffstage: false),
+      find.text('Pain & symptom tracker', skipOffstage: false),
       findsOneWidget,
     );
     expect(
@@ -561,6 +561,57 @@ void main() {
 
     expect(find.text('Emergency information'), findsOneWidget);
     expect(find.text('Call emergency services (112)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'symptom check-in validates and adds a local timeline event on a narrow screen',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        const CrisisTrackingScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final logSymptoms = find.widgetWithText(OutlinedButton, 'Log symptoms');
+    await tester.fling(
+      find.byKey(const Key('crisis-tracker-list')),
+      const Offset(0, -900),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(logSymptoms);
+    await tester.pumpAndSettle();
+
+    final saveButton = find.byKey(const Key('save-symptoms-button'));
+    await tester.ensureVisible(saveButton);
+    await tester.tap(saveButton);
+    await tester.pump();
+    expect(find.text('Add at least one symptom to continue.'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('symptom-input')),
+      'fatigue, joint pain',
+    );
+    await tester.ensureVisible(saveButton);
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+
+    final event = provider.timeline.firstWhere(
+      (item) => item.id.startsWith('symptom-'),
+    );
+    expect(event.type, HealthTimelineEventType.symptom);
+    expect(event.severity, 4);
+    expect(event.description, contains('fatigue · joint pain'));
+    expect(find.text('Symptoms logged in this UI preview.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

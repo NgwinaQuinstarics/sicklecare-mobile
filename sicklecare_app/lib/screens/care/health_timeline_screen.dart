@@ -80,7 +80,7 @@ class _HealthTimelineScreenState extends State<HealthTimelineScreen> {
                     title: 'No ${_filter?.label.toLowerCase() ?? ''} events yet'
                         .trim(),
                     subtitle:
-                        'Log hydration, medicines or a crisis preview to build the timeline.',
+                        'Log symptoms, hydration, medicines or a crisis preview to build the timeline.',
                   )
                 else
                   _Timeline(events: events),

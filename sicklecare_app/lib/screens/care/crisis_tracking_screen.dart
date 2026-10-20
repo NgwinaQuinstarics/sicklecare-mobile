@@ -27,6 +27,21 @@ class CrisisTrackingScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _logSymptoms(BuildContext context) async {
+    final event = await showModalBottomSheet<HealthTimelineEvent>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _SymptomFormSheet(),
+    );
+    if (event == null || !context.mounted) return;
+    context.read<CareUiProvider>().addTimelineEvent(event);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Symptoms logged in this UI preview.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final care = context.watch<CareUiProvider>();
@@ -69,6 +84,68 @@ class CrisisTrackingScreen extends StatelessWidget {
                   title: 'Private UI preview',
                   message:
                       'Crisis logs in this screen are temporary mock entries and are not shared with a clinician.',
+                ),
+                const SizedBox(height: 14),
+                SectionCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(
+                              Icons.healing_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Track symptoms separately',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Record everyday changes without starting a pain-crisis entry.',
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _logSymptoms(context),
+                          icon: const Icon(Icons.add_chart_outlined),
+                          label: const Text('Log symptoms'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 22),
                 Text(
@@ -416,6 +493,149 @@ class _CrisisFormSheetState extends State<_CrisisFormSheet> {
                 onPressed: _submit,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('Save crisis preview'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SymptomFormSheet extends StatefulWidget {
+  const _SymptomFormSheet();
+
+  @override
+  State<_SymptomFormSheet> createState() => _SymptomFormSheetState();
+}
+
+class _SymptomFormSheetState extends State<_SymptomFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _symptoms = TextEditingController();
+  final _notes = TextEditingController();
+  double _severity = 4;
+
+  @override
+  void dispose() {
+    _symptoms.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  List<String> _splitSymptoms(String value) => value
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+
+  String? _validateSymptoms(String? value) {
+    if (_splitSymptoms(value ?? '').isEmpty) {
+      return 'Add at least one symptom to continue.';
+    }
+    return null;
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final symptoms = _splitSymptoms(_symptoms.text);
+    final notes = _notes.text.trim();
+    Navigator.pop(
+      context,
+      HealthTimelineEvent(
+        id: 'symptom-${DateTime.now().millisecondsSinceEpoch}',
+        occurredAt: DateTime.now(),
+        type: HealthTimelineEventType.symptom,
+        title: 'Symptom check-in',
+        description: [
+          symptoms.join(' · '),
+          if (notes.isNotEmpty) 'Notes: $notes',
+        ].join('\n'),
+        severity: _severity.round(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 18,
+        right: 18,
+        top: 18,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          key: const Key('symptom-check-in-form'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Log symptoms',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'This is a self-management note, not a diagnosis or an emergency assessment.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 18),
+              TextFormField(
+                key: const Key('symptom-input'),
+                controller: _symptoms,
+                validator: _validateSymptoms,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Symptoms',
+                  hintText: 'e.g. fatigue, joint pain',
+                  helperText: 'Separate more than one symptom with commas.',
+                  prefixIcon: Icon(Icons.healing_outlined),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'How intense does it feel? ${_severity.round()} / 10',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Semantics(
+                label: 'Symptom intensity',
+                value: '${_severity.round()} out of 10',
+                child: Slider(
+                  value: _severity,
+                  min: 0,
+                  max: 10,
+                  divisions: 10,
+                  label: _severity.round().toString(),
+                  semanticFormatterCallback: (value) =>
+                      '${value.round()} out of 10',
+                  onChanged: (value) => setState(() => _severity = value),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                key: const Key('symptom-notes-input'),
+                controller: _notes,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  hintText: 'Anything else you want to remember?',
+                  prefixIcon: Icon(Icons.note_alt_outlined),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('save-symptoms-button'),
+                  onPressed: _submit,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Save symptom check-in'),
+                ),
               ),
             ],
           ),

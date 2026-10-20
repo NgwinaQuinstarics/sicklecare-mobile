@@ -97,8 +97,8 @@ class CareHubScreen extends StatelessWidget {
                 ),
                 _CareLink(
                   icon: Icons.monitor_heart_outlined,
-                  title: 'Pain crisis tracker',
-                  subtitle: 'Log symptoms, severity and care actions',
+                  title: 'Pain & symptom tracker',
+                  subtitle: 'Log a crisis or everyday symptoms with severity',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                         builder: (_) => const CrisisTrackingScreen()),
