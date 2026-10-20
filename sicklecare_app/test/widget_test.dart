@@ -6,10 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:sicklecare_app/data/care_ui_repository.dart';
 import 'package:sicklecare_app/login.dart';
 import 'package:sicklecare_app/models/doctor_profile.dart';
+import 'package:sicklecare_app/models/health_tracking.dart';
 import 'package:sicklecare_app/models/healthcare_facility.dart';
 import 'package:sicklecare_app/providers/care_ui_provider.dart';
 import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
+import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_registration_screen.dart';
@@ -258,10 +260,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('No sessions on this day'),
       300,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('doctor-schedule-list')),
-        matching: find.byType(Scrollable),
-      ).first,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('doctor-schedule-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(find.text('No sessions on this day'), findsOneWidget);
 
@@ -512,6 +516,52 @@ void main() {
 
     expect(find.text('Emergency preview unavailable'), findsOneWidget);
     expect(find.text('Call emergency services (112)'), findsOneWidget);
+  });
+
+  testWidgets(
+      'a flagged crisis links to emergency information on a narrow screen',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    provider.addPainCrisis(
+      PainCrisis(
+        id: 'needs-attention',
+        startedAt: DateTime.now(),
+        intensity: 8,
+        symptoms: const ['Severe pain'],
+        affectedAreas: const ['Chest'],
+        notes: 'Preview-only safety-flow test.',
+        requiresMedicalAttention: true,
+      ),
+    );
+
+    await tester.pumpWidget(
+      previewApp(
+        const CrisisTrackingScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final emergencyButton = find.widgetWithText(
+      OutlinedButton,
+      'View emergency information',
+    );
+    await tester.dragUntilVisible(
+      emergencyButton,
+      find.byKey(const Key('crisis-tracker-list')),
+      const Offset(0, -300),
+    );
+    await tester.ensureVisible(emergencyButton);
+    await tester.pumpAndSettle();
+    await tester.tap(emergencyButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Emergency information'), findsOneWidget);
+    expect(find.text('Call emergency services (112)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   test('mock care provider filters facilities and updates hydration', () async {

@@ -6,6 +6,7 @@ import '../../providers/care_ui_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
+import 'emergency_information_screen.dart';
 
 /// A non-diagnostic pain-crisis journal that stores entries in memory only.
 class CrisisTrackingScreen extends StatelessWidget {
@@ -53,6 +54,7 @@ class CrisisTrackingScreen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
             child: ListView(
+              key: const Key('crisis-tracker-list'),
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 100),
               children: [
                 StatusBanner(
@@ -169,6 +171,22 @@ class _CrisisCard extends StatelessWidget {
               title: 'Medical attention flagged',
               message:
                   'This marker is only a journal entry; seek professional care if symptoms are serious or worsening.',
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const EmergencyInformationScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.emergency_outlined),
+                label: const Text(
+                  'View emergency information',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ],
           if (crisis.isOngoing) ...[
