@@ -164,9 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscure
-                                ? Icons.visibility
-                                : Icons.visibility_off,
+                            _obscure ? Icons.visibility : Icons.visibility_off,
                           ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
@@ -206,8 +204,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Text(l.signIn),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(l.noAccount),
                         TextButton(

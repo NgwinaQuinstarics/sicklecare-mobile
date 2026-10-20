@@ -10,6 +10,7 @@ import 'credential_submission_screen.dart';
 import 'doctor_profile_screen.dart';
 import 'doctor_ui_components.dart';
 import 'doctor_verification_status_screen.dart';
+import '../facilities/facilities_screen.dart';
 
 /// A clinician home workspace designed to work with temporary presentation
 /// data. Integrators can pass the current profile values or wire its actions
@@ -67,7 +68,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final previewProfile = context.watch<CareUiProvider>().doctorProfile;
+    final care = context.watch<CareUiProvider>();
+    final previewProfile = care.doctorProfile;
     final doctorName = previewProfile?.fullName ?? widget.doctorName;
     final specialty = previewProfile?.specialty ?? widget.specialty;
     final facilityName = previewProfile?.facilityName ?? widget.facilityName;
@@ -455,6 +457,62 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     icon: const Icon(Icons.verified_user_outlined),
                     label: const Text('Review verification status'),
                   ),
+                  const SizedBox(height: 24),
+                  const DoctorSectionHeader(
+                    title: 'Care directory',
+                    subtitle:
+                        'Find nearby facilities and services for care coordination.',
+                  ),
+                  const SizedBox(height: 12),
+                  SectionCard(
+                    onTap: _openCareDirectory,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.local_hospital_outlined,
+                            color: cs.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Browse care facilities',
+                                style: tt.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Search services, opening hours and contact details.',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: cs.onSurfaceVariant,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -469,6 +527,31 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       MaterialPageRoute(
         builder: (_) => CredentialSubmissionScreen(
           verificationStatus: verificationStatus,
+        ),
+      ),
+    );
+  }
+
+  void _openCareDirectory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Consumer<CareUiProvider>(
+          builder: (context, care, _) {
+            final viewState = care.isLoading && !care.hasLoaded
+                ? FacilitiesViewState.loading
+                : !care.hasLoaded && care.errorMessage != null
+                    ? FacilitiesViewState.error
+                    : FacilitiesViewState.content;
+            return FacilitiesScreen(
+              facilities: care.facilities,
+              viewState: viewState,
+              errorMessage: care.errorMessage,
+              onRetry: care.retry,
+              onRefresh: () => care.load(force: true),
+              onFacilitySelected: care.selectFacility,
+              locationLabel: 'Care network · preview area',
+            );
+          },
         ),
       ),
     );

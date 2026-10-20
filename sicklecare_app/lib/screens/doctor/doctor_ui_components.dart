@@ -31,15 +31,16 @@ class DoctorStatusPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(99),
           border: Border.all(color: presentation.color.withValues(alpha: 0.22)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Wrap(
+          spacing: 5,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Icon(
               presentation.icon,
               size: compact ? 15 : 16,
               color: presentation.color,
             ),
-            const SizedBox(width: 5),
             Text(
               presentation.label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -96,15 +97,20 @@ class DoctorStatusBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                // A long verification title and its status must be allowed to
+                // wrap independently on narrow screens or when the user has
+                // increased their system text size. A Row made the status pill
+                // compete with the title for a fixed width and could overflow.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: Text(
-                        resolvedTitle,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
+                    Text(
+                      resolvedTitle,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     DoctorStatusPill(status: status, compact: true),
                   ],

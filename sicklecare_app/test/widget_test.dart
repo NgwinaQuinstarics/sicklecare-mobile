@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:sicklecare_app/data/care_ui_repository.dart';
+import 'package:sicklecare_app/login.dart';
 import 'package:sicklecare_app/models/doctor_profile.dart';
 import 'package:sicklecare_app/models/healthcare_facility.dart';
 import 'package:sicklecare_app/providers/care_ui_provider.dart';
@@ -15,11 +18,37 @@ import 'package:sicklecare_app/screens/facilities/facilities_screen.dart';
 import 'package:sicklecare_app/screens/facilities/facility_detail_screen.dart';
 import 'package:sicklecare_app/theme/app_theme.dart';
 
-Widget previewApp(Widget child, {CareUiProvider? provider}) {
+Widget previewApp(
+  Widget child, {
+  CareUiProvider? provider,
+  TextScaler? textScaler,
+}) {
   return ChangeNotifierProvider<CareUiProvider>.value(
     value: provider ?? CareUiProvider(),
-    child: MaterialApp(theme: AppTheme.light(), home: child),
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      builder: (context, routedChild) {
+        final resolvedChild = routedChild ?? const SizedBox.shrink();
+        if (textScaler == null) return resolvedChild;
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: resolvedChild,
+        );
+      },
+      home: child,
+    ),
   );
+}
+
+class _ControlledCareUiRepository implements CareUiRepository {
+  final requests = <Completer<CareUiData>>[];
+
+  @override
+  Future<CareUiData> load() {
+    final request = Completer<CareUiData>();
+    requests.add(request);
+    return request.future;
+  }
 }
 
 void main() {
@@ -39,6 +68,21 @@ void main() {
       find.text('Clinician onboarding is a UI preview', skipOffstage: false),
       findsNothing,
     );
+  });
+
+  testWidgets('back from role selection returns to sign in', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const LoginScreen()),
+    );
+
+    expect(find.text('Welcome back'), findsOneWidget);
+    await tester.tap(find.text('Sign up'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose your SickleCare path'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('doctor registration presents its professional form',
@@ -109,7 +153,115 @@ void main() {
 
     expect(find.text('Care workspace'), findsOneWidget);
     expect(find.textContaining('Dr. Jordan'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('2 remaining'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('2 remaining'), findsOneWidget);
+    expect(find.text('Due this week'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'doctor workspace stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false)
+      ..updateDoctorProfile(
+        const DoctorProfile(
+          id: 'large-text-doctor',
+          fullName: 'Dr. Jordan M.',
+          specialty: 'Haematology',
+          qualifications: ['MD'],
+          facilityName: 'Preview Hospital',
+          email: 'doctor@example.test',
+          phoneNumber: '+237 600 000 000',
+          availabilitySummary: 'Mon–Fri',
+          isAvailable: true,
+          verificationStatus: DoctorVerificationStatus.pending,
+          credentials: [],
+        ),
+      );
+
+    await tester.pumpWidget(
+      previewApp(
+        const DoctorDashboardScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Today’s sessions'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Today’s sessions'), findsOneWidget);
+    expect(find.text('Care-plan reviews'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('doctor workspace opens the care directory', (tester) async {
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(const DoctorDashboardScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Browse care facilities'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Browse care facilities'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Find care'), findsOneWidget);
+    expect(find.text('SickleCare Preview Hospital'), findsOneWidget);
+  });
+
+  testWidgets('care directory updates from loading and retry states',
+      (tester) async {
+    final repository = _ControlledCareUiRepository();
+    final provider = CareUiProvider(repository: repository, autoLoad: false);
+    final firstLoad = provider.load();
+    await tester.pump();
+
+    await tester.pumpWidget(
+      previewApp(const DoctorDashboardScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Browse care facilities'),
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Browse care facilities'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Finding care near you…'), findsOneWidget);
+    expect(repository.requests, hasLength(1));
+
+    repository.requests.first.completeError(StateError('Preview failure'));
+    await firstLoad;
+    await tester.pumpAndSettle();
+    expect(find.text('Facilities are unavailable'), findsOneWidget);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    expect(find.text('Finding care near you…'), findsOneWidget);
+    expect(repository.requests, hasLength(2));
+
+    repository.requests[1].complete(await const MockCareUiRepository().load());
+    await tester.pumpAndSettle();
+    expect(find.text('SickleCare Preview Hospital'), findsOneWidget);
   });
 
   testWidgets('care hub exposes the new warrior health tools', (tester) async {
