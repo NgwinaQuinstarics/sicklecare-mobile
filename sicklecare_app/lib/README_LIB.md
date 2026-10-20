@@ -20,8 +20,8 @@ dependencies you shared.
 ## Setup steps after extracting
 1. Replace your old `lib/` folder with this one.
 2. Run `flutterfire configure` (this regenerates `firebase_options.dart`).
-3. Make sure your `.env` (optional) contains `OPENAI_API_KEY=...` if you want
-   the AI chat to call a real model. Otherwise it uses helpful canned replies.
+3. The AI chat uses its safe local fallback until a protected backend AI
+   integration is available. Do not package provider API keys in the app.
 4. `flutter pub get`
 5. `flutter run`
 

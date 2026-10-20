@@ -3,12 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'l10n/strings.dart';
 import 'providers/auth_provider.dart';
+import 'providers/care_ui_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/tracker_provider.dart';
 import 'providers/reminder_provider.dart';
@@ -22,15 +22,6 @@ import 'auth_gate.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Phase 1: dotenv + Firebase can initialise in parallel.
-  Future<void> loadEnv() async {
-    try {
-      await dotenv.load(fileName: ".env");
-    } catch (e) {
-      debugPrint('dotenv load error: $e');
-    }
-  }
-
   Future<FirebaseApp?> initFirebase() async {
     try {
       return await Firebase.initializeApp(
@@ -42,10 +33,7 @@ Future<void> main() async {
     }
   }
 
-  await Future.wait([
-    loadEnv(),
-    initFirebase(),
-  ]);
+  await initFirebase();
 
   await AppSecurityService.instance.init();
 
@@ -81,6 +69,9 @@ class SickleCareApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // UI-only mock state for new care pathways. This is intentionally
+        // separate from Firebase until models and data requirements are agreed.
+        ChangeNotifierProvider(create: (_) => CareUiProvider()),
         ChangeNotifierProvider(create: (_) => TrackerProvider()),
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
       ],

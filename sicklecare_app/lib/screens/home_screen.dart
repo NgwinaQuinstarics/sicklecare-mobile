@@ -13,6 +13,7 @@ import 'weather_screen.dart';
 import 'support_screen.dart';
 import 'settings/settings_screen.dart';
 import 'admin/admin_screen.dart';
+import 'care/care_hub_screen.dart';
 
 /// Home dashboard tab: greeting + today's snapshot (hydration, pain, next
 /// reminder) + quick actions + secondary "explore" shortcuts.
@@ -329,6 +330,18 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 20),
             Text(l.explore, style: tt.titleMedium),
             const SizedBox(height: 12),
+            _ExploreTile(
+              icon: Icons.health_and_safety_outlined,
+              title: l.tr('My care hub', 'Mon espace santé'),
+              subtitle: l.tr(
+                'Health profile, medication, crisis and emergency tools',
+                'Profil santé, médicaments, crises et outils d’urgence',
+              ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CareHubScreen()),
+              ),
+            ),
+            const SizedBox(height: 10),
             _ExploreTile(
               icon: Icons.local_drink_outlined,
               title: l.hydrationDiet,

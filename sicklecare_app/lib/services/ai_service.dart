@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive/hive.dart';
 
 /// AI helper backed by Groq's OpenAI-compatible Chat Completions API.
 ///
-/// Reads key from Hive (saved by user in-app) or falls back to `.env`.
-/// The assistant is tuned for the CAMEROONIAN context. If no key is configured
-/// or the request fails, it returns a smart, interactive local conversational
-/// fallback so the chat screen always stays fully usable.
+/// Uses an optional key explicitly supplied in the app for a development
+/// preview. The production integration should route AI requests through a
+/// protected backend rather than package a provider key in the mobile app.
+/// If no key is configured or the request fails, the service returns a local
+/// conversational fallback so the chat screen stays usable.
 class AIService {
   static const _endpoint = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -56,11 +56,6 @@ class AIService {
       final box = Hive.box('app_cache');
       key = box.get('user_groq_api_key') ?? box.get('user_openai_api_key');
     } catch (_) {}
-
-    if (key == null || key.isEmpty) {
-      key =
-          dotenv.maybeGet('GROQ_API_KEY') ?? dotenv.maybeGet('OPENAI_API_KEY');
-    }
 
     if (key == null || key.isEmpty) {
       return _fallback(prompt, healthContext: healthContext);
