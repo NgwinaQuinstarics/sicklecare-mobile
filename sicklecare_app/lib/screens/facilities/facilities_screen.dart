@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/healthcare_facility.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/facility_map_preview.dart';
 import '../../widgets/section_card.dart';
 import 'facility_detail_screen.dart';
 
@@ -174,6 +175,21 @@ class _FacilitiesScreenState extends State<FacilitiesScreen> {
     );
   }
 
+  Future<void> _showMapPreview(
+    List<HealthcareFacility> facilities,
+  ) async {
+    final selected = await showModalBottomSheet<HealthcareFacility>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FacilityMapPreviewSheet(
+        facilities: facilities,
+        locationLabel: widget.locationLabel,
+      ),
+    );
+    if (!mounted || selected == null) return;
+    _openFacility(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -219,6 +235,9 @@ class _FacilitiesScreenState extends State<FacilitiesScreen> {
             onEmergencyChanged: (value) =>
                 setState(() => _emergencyOnly = value),
             onFacilityTap: _openFacility,
+            onShowMap: _visibleFacilities.isEmpty
+                ? null
+                : () => _showMapPreview(_visibleFacilities),
             onRefresh: _refresh,
           ),
       },
@@ -245,6 +264,7 @@ class _FacilitiesContent extends StatelessWidget {
   final ValueChanged<bool> onOpenNowChanged;
   final ValueChanged<bool> onEmergencyChanged;
   final ValueChanged<HealthcareFacility> onFacilityTap;
+  final VoidCallback? onShowMap;
   final RefreshCallback onRefresh;
 
   const _FacilitiesContent({
@@ -266,6 +286,7 @@ class _FacilitiesContent extends StatelessWidget {
     required this.onOpenNowChanged,
     required this.onEmergencyChanged,
     required this.onFacilityTap,
+    required this.onShowMap,
     required this.onRefresh,
   });
 
@@ -283,6 +304,7 @@ class _FacilitiesContent extends StatelessWidget {
                   ? 2
                   : 1;
           return ListView(
+            key: const Key('facilities-list'),
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
             children: [
@@ -374,6 +396,18 @@ class _FacilitiesContent extends StatelessWidget {
                             ),
                         ],
                       ),
+                      if (onShowMap != null) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            key: const Key('open-facility-map-preview'),
+                            onPressed: onShowMap,
+                            icon: const Icon(Icons.map_outlined),
+                            label: const Text('View map preview'),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       Row(
                         children: [

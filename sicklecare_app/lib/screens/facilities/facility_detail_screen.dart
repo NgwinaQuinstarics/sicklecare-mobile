@@ -389,8 +389,8 @@ class _HeroPill extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.17),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (icon != null) ...[
             Icon(icon, size: 14, color: Colors.white),
@@ -485,7 +485,7 @@ class _OverviewMetric extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 34,
@@ -497,16 +497,25 @@ class _OverviewMetric extends StatelessWidget {
             child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(width: 9),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 1),
-              Text(
-                detail,
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11.5),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11.5),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -541,10 +550,21 @@ class _LocationMapCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(17),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final addressDetails = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Address',
+                        style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${facility.address}, ${facility.city}',
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                );
+                final addressIcon = Container(
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
@@ -552,28 +572,44 @@ class _LocationMapCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(Icons.location_on_outlined, color: cs.primary),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Address',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${facility.address}, ${facility.city}',
-                        style: TextStyle(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton.icon(
+                );
+                final directionsAction = TextButton.icon(
                   onPressed: onDirections,
                   icon: const Icon(Icons.directions_outlined, size: 18),
                   label: const Text('Directions'),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 360) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          addressIcon,
+                          const SizedBox(width: 11),
+                          Expanded(child: addressDetails),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: directionsAction,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    addressIcon,
+                    const SizedBox(width: 11),
+                    Expanded(child: addressDetails),
+                    directionsAction,
+                  ],
+                );
+              },
             ),
           ),
         ],

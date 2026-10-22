@@ -371,6 +371,82 @@ void main() {
     );
   });
 
+  testWidgets(
+      'facility map preview follows filters and opens a selected facility',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final data = await const MockCareUiRepository().load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(1.3)),
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: FacilitiesScreen(facilities: data.facilities),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final openMap = find.byKey(const Key('open-facility-map-preview'));
+    await tester.scrollUntilVisible(
+      openMap,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(openMap);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Facility map preview'), findsOneWidget);
+    expect(find.text('3 places from the current results'), findsOneWidget);
+    final clinicPin =
+        find.byKey(const Key('facility-map-pin-mock-facility-bonaberi-clinic'));
+    await tester.ensureVisible(clinicPin);
+    await tester.tap(clinicPin);
+    await tester.pumpAndSettle();
+    final openDetails = find.byKey(const Key('map-preview-open-details'));
+    await tester.ensureVisible(openDetails);
+    expect(find.text('SickleCare Preview Clinic'), findsWidgets);
+    await tester.tap(openDetails);
+    await tester.pumpAndSettle();
+    expect(find.byType(FacilityDetailScreen), findsOneWidget);
+    expect(find.text('SickleCare Preview Clinic'), findsWidgets);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.fling(
+      find.byKey(const Key('facilities-list')),
+      const Offset(0, 1000),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    final emergencyFilter = find.widgetWithText(FilterChip, 'Emergency care');
+    await tester.tap(emergencyFilter);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      openMap,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(openMap);
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 place from the current results'), findsOneWidget);
+    expect(
+      find.byKey(
+          const Key('facility-map-pin-mock-facility-community-hospital')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('facility-map-pin-mock-facility-bonaberi-clinic')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('facility detail stays usable on a narrow screen',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(375, 800));
