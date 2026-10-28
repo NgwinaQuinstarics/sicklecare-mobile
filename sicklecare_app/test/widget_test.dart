@@ -13,7 +13,9 @@ import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
+import 'package:sicklecare_app/screens/care/warrior_health_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
+import 'package:sicklecare_app/screens/doctor/doctor_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_registration_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_schedule_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_verification_status_screen.dart';
@@ -348,6 +350,110 @@ void main() {
       find.text('Emergency information', skipOffstage: false),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+      'warrior health profile stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        WarriorHealthProfileScreen(profile: provider.warriorProfile!),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Safety notes'),
+      300,
+      scrollable: scrollable,
+    );
+    expect(find.text('Known triggers (comma-separated)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'professional profile stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    final profile = provider.doctorProfile!;
+
+    await tester.pumpWidget(
+      previewApp(
+        DoctorProfessionalProfileScreen(
+          fullName: profile.fullName,
+          specialty: profile.specialty,
+          facilityName: profile.facilityName,
+          verificationStatus: profile.verificationStatus,
+          profile: profile,
+        ),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Qualifications (comma-separated)'),
+      300,
+      scrollable: scrollable,
+    );
+    expect(find.text('Qualifications (comma-separated)'), findsOneWidget);
+    expect(
+      find.text('MD, Clinical Haematology Fellowship'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Availability & contact'),
+      300,
+      scrollable: scrollable,
+    );
+    expect(find.text('Professional email'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('professional profile saves preview qualifications',
+      (tester) async {
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    final profile = provider.doctorProfile!;
+
+    await tester.pumpWidget(
+      previewApp(
+        DoctorProfessionalProfileScreen(
+          fullName: profile.fullName,
+          specialty: profile.specialty,
+          facilityName: profile.facilityName,
+          verificationStatus: profile.verificationStatus,
+          profile: profile,
+        ),
+        provider: provider,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Save'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(2), 'MD, MPH');
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    expect(provider.doctorProfile!.qualifications, ['MD', 'MPH']);
+    expect(find.text('MD, MPH'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('facility discovery renders mock facility records',

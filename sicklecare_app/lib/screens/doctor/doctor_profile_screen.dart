@@ -35,6 +35,7 @@ class _DoctorProfessionalProfileScreenState
     extends State<DoctorProfessionalProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _specialty;
+  late final TextEditingController _qualifications;
   late final TextEditingController _facility;
   late final TextEditingController _bio;
   late final TextEditingController _availability;
@@ -52,6 +53,9 @@ class _DoctorProfessionalProfileScreenState
     _name = TextEditingController(text: profile?.fullName ?? widget.fullName);
     _specialty =
         TextEditingController(text: profile?.specialty ?? widget.specialty);
+    _qualifications = TextEditingController(
+      text: profile?.qualifications.join(', ') ?? '',
+    );
     _facility = TextEditingController(
         text: profile?.facilityName ?? widget.facilityName);
     _bio = TextEditingController(
@@ -75,6 +79,7 @@ class _DoctorProfessionalProfileScreenState
   void dispose() {
     _name.dispose();
     _specialty.dispose();
+    _qualifications.dispose();
     _facility.dispose();
     _bio.dispose();
     _availability.dispose();
@@ -98,6 +103,7 @@ class _DoctorProfessionalProfileScreenState
             profile.copyWith(
               fullName: _name.text.trim(),
               specialty: _specialty.text.trim(),
+              qualifications: _terms(_qualifications.text),
               facilityName: _facility.text.trim(),
               bio: _bio.text.trim(),
               availabilitySummary: _availability.text.trim(),
@@ -112,6 +118,12 @@ class _DoctorProfessionalProfileScreenState
           content: Text('Professional profile updated in this preview.')),
     );
   }
+
+  List<String> _terms(String value) => value
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +202,7 @@ class _DoctorProfessionalProfileScreenState
                     tone: StatusBannerTone.info,
                     title: 'Preview profile',
                     message:
-                        'Edits are visible only in this screen while the professional-profile data contract is being finalised.',
+                        'Edits are visible in this local preview session while the professional-profile data contract is being finalised.',
                   ),
                   const SizedBox(height: 20),
                   _ProfileSection(
@@ -214,6 +226,14 @@ class _DoctorProfessionalProfileScreenState
                           textCapitalization: TextCapitalization.words,
                           validator: _required('a specialty'),
                           onChanged: (_) => setState(() {}),
+                        ),
+                        _ProfileField(
+                          controller: _qualifications,
+                          label: 'Qualifications (comma-separated)',
+                          icon: Icons.school_outlined,
+                          editing: _editing,
+                          maxLines: 2,
+                          textCapitalization: TextCapitalization.words,
                         ),
                         _ProfileField(
                           controller: _facility,

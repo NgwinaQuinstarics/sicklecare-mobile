@@ -25,32 +25,33 @@ class SectionCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final radius = BorderRadius.circular(20);
 
-    final card = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: gradient == null
-            ? (Theme.of(context).cardTheme.color ?? cs.surfaceContainer)
-            : null,
-        gradient: gradient,
-        borderRadius: radius,
-        border: gradient == null
-            ? Border.all(color: cs.outlineVariant.withValues(alpha: 0.7))
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-
-    if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(onTap: onTap, borderRadius: radius, child: card),
+      borderRadius: radius,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: gradient == null
+              ? (Theme.of(context).cardTheme.color ?? cs.surfaceContainer)
+              : null,
+          gradient: gradient,
+          borderRadius: radius,
+          border: gradient == null
+              ? Border.all(color: cs.outlineVariant.withValues(alpha: 0.7))
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.05),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
     );
   }
 }
