@@ -14,6 +14,7 @@ import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
 import 'package:sicklecare_app/screens/care/warrior_health_profile_screen.dart';
+import 'package:sicklecare_app/screens/doctor/credential_submission_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_registration_screen.dart';
@@ -614,6 +615,41 @@ void main() {
     );
     expect(find.text('Emergency information'), findsOneWidget);
     expect(find.text('Emergency card', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets(
+      'credential submission stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        const CredentialSubmissionScreen(
+          verificationStatus: DoctorVerificationStatus.pending,
+        ),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final attachDocument =
+        find.widgetWithText(OutlinedButton, 'Attach preview document');
+    await tester.dragUntilVisible(
+      attachDocument,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    await tester.ensureVisible(attachDocument);
+    await tester.pumpAndSettle();
+    expect(find.text('Reference number (optional)'), findsOneWidget);
+    await tester.tap(attachDocument);
+    await tester.pumpAndSettle();
+    expect(find.text('Attach a preview document'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('verification opens the local credential submission flow',

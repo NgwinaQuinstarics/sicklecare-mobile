@@ -50,37 +50,45 @@ class _CredentialSubmissionScreenState
   Future<void> _choosePreviewDocument() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Attach a preview document',
-                style: Theme.of(context).textTheme.titleLarge,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Attach a preview document',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'File upload will be connected only after storage, privacy, and review requirements are agreed.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final file in const [
+                    'medical_licence.pdf',
+                    'specialty_certificate.pdf',
+                    'professional_registration.pdf',
+                  ])
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.picture_as_pdf_outlined),
+                      title: Text(file),
+                      onTap: () => Navigator.pop(context, file),
+                    ),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'File upload will be connected only after storage, privacy, and review requirements are agreed.',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (final file in const [
-                'medical_licence.pdf',
-                'specialty_certificate.pdf',
-                'professional_registration.pdf',
-              ])
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.picture_as_pdf_outlined),
-                  title: Text(file),
-                  onTap: () => Navigator.pop(context, file),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -175,6 +183,7 @@ class _CredentialSubmissionScreenState
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
                           initialValue: _credentialType,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Document type',
                             prefixIcon: Icon(Icons.badge_outlined),
