@@ -13,6 +13,7 @@ import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
+import 'package:sicklecare_app/screens/care/health_timeline_screen.dart';
 import 'package:sicklecare_app/screens/care/warrior_health_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_profile_screen.dart';
@@ -639,8 +640,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final addCredentials =
-        find.widgetWithText(FilledButton, 'Add credentials');
+    final addCredentials = find.widgetWithText(FilledButton, 'Add credentials');
     await tester.scrollUntilVisible(
       addCredentials,
       300,
@@ -661,7 +661,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('medical_licence.pdf'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Add for review'));
+    await tester
+        .ensureVisible(find.widgetWithText(FilledButton, 'Add for review'));
     await tester.tap(find.widgetWithText(FilledButton, 'Add for review'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
@@ -869,6 +870,55 @@ void main() {
     expect(event.severity, 4);
     expect(event.description, contains('fatigue · joint pain'));
     expect(find.text('Symptoms logged in this UI preview.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ending a crisis adds a local health timeline event',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    final startedAt = DateTime.now().subtract(const Duration(hours: 2));
+    provider.addPainCrisis(
+      PainCrisis(
+        id: 'ongoing-crisis',
+        startedAt: startedAt,
+        intensity: 7,
+        symptoms: const ['Joint pain'],
+        affectedAreas: const ['Lower back'],
+      ),
+    );
+
+    await tester.pumpWidget(
+      previewApp(const CrisisTrackingScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+
+    final endCrisis = find.widgetWithText(OutlinedButton, 'Mark as ended');
+    await tester.ensureVisible(endCrisis);
+    await tester.tap(endCrisis);
+    await tester.pumpAndSettle();
+
+    final crisis = provider.painCrises.firstWhere(
+      (item) => item.id == 'ongoing-crisis',
+    );
+    expect(crisis.endedAt, isNotNull);
+    final completedEvent = provider.timeline.firstWhere(
+      (item) => item.id == 'crisis-ended-ongoing-crisis',
+    );
+    expect(completedEvent.title, 'Pain crisis marked as ended');
+    expect(completedEvent.severity, 7);
+    expect(
+      find.text('Crisis marked as ended and added to your local timeline.'),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(
+      previewApp(const HealthTimelineScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pain crisis marked as ended'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

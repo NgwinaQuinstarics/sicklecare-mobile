@@ -388,6 +388,16 @@ class CareUiProvider extends ChangeNotifier {
   }
 
   void endPainCrisis(String crisisId, DateTime endedAt) {
+    final crisis = _painCrises.cast<PainCrisis?>().firstWhere(
+          (item) => item?.id == crisisId,
+          orElse: () => null,
+        );
+    if (crisis == null ||
+        !crisis.isOngoing ||
+        endedAt.isBefore(crisis.startedAt)) {
+      return;
+    }
+
     _painCrises = _painCrises
         .map(
           (crisis) => crisis.id == crisisId
@@ -395,6 +405,16 @@ class CareUiProvider extends ChangeNotifier {
               : crisis,
         )
         .toList();
+    _addTimelineEvent(
+      HealthTimelineEvent(
+        id: 'crisis-ended-${crisis.id}',
+        occurredAt: endedAt,
+        type: HealthTimelineEventType.crisis,
+        title: 'Pain crisis marked as ended',
+        description: 'Marked as ended in this local preview.',
+        severity: crisis.intensity,
+      ),
+    );
     notifyListeners();
   }
 

@@ -273,7 +273,10 @@ class _CrisisCard extends StatelessWidget {
                 care.endPainCrisis(crisis.id, DateTime.now());
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Crisis marked as ended in preview.')),
+                    content: Text(
+                      'Crisis marked as ended and added to your local timeline.',
+                    ),
+                  ),
                 );
               },
               icon: const Icon(Icons.check_circle_outline),
