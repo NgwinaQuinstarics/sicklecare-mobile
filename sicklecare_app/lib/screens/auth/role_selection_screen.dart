@@ -96,11 +96,21 @@ class RoleSelectionScreen extends StatelessWidget {
                   accent: const Color(0xFF1976A8),
                   onPressed: () => _openDoctorRegistration(context),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Text(
-                  'Already have an account? Return to sign in and use the role assigned to your account once role management is connected.',
+                  'Already have an account?',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: Navigator.of(context).canPop()
+                        ? () => Navigator.of(context).pop()
+                        : null,
+                    icon: const Icon(Icons.login_outlined),
+                    label: const Text('Sign in'),
+                  ),
                 ),
               ],
             ),

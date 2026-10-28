@@ -90,6 +90,26 @@ void main() {
     expect(find.text('Welcome back'), findsOneWidget);
   });
 
+  testWidgets('role selection provides an explicit return to sign in',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const LoginScreen()),
+    );
+
+    await tester.tap(find.text('Sign up'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose your SickleCare path'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Sign in'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome back'), findsOneWidget);
+  });
+
   testWidgets('doctor registration presents its professional form',
       (tester) async {
     await tester.pumpWidget(previewApp(const DoctorRegistrationScreen()));
