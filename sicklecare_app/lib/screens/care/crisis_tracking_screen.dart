@@ -7,6 +7,7 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
 import 'emergency_information_screen.dart';
+import 'health_timeline_screen.dart';
 
 /// A non-diagnostic pain-crisis journal that stores entries in memory only.
 class CrisisTrackingScreen extends StatelessWidget {
@@ -241,6 +242,11 @@ class _CrisisCard extends StatelessWidget {
             _CrisisRow(label: 'Care action', value: crisis.actionTaken),
           if (crisis.notes.isNotEmpty)
             _CrisisRow(label: 'Notes', value: crisis.notes),
+          if (crisis.endedAt != null)
+            _CrisisRow(
+              label: 'Ended',
+              value: _formatDateTime(crisis.endedAt!),
+            ),
           if (crisis.requiresMedicalAttention) ...[
             const SizedBox(height: 8),
             StatusBanner(
@@ -269,18 +275,20 @@ class _CrisisCard extends StatelessWidget {
           if (crisis.isOngoing) ...[
             const SizedBox(height: 14),
             OutlinedButton.icon(
-              onPressed: () {
-                care.endPainCrisis(crisis.id, DateTime.now());
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Crisis marked as ended and added to your local timeline.',
-                    ),
-                  ),
-                );
-              },
+              onPressed: () => care.endPainCrisis(crisis.id, DateTime.now()),
               icon: const Icon(Icons.check_circle_outline),
               label: const Text('Mark as ended'),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const HealthTimelineScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.timeline_outlined),
+              label: const Text('View health timeline'),
             ),
           ],
         ],

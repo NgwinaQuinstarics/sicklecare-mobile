@@ -13,7 +13,6 @@ import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
-import 'package:sicklecare_app/screens/care/health_timeline_screen.dart';
 import 'package:sicklecare_app/screens/care/warrior_health_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_profile_screen.dart';
@@ -875,10 +874,9 @@ void main() {
 
   testWidgets('ending a crisis adds a local health timeline event',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    await tester.binding.setSurfaceSize(const Size(320, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final provider = CareUiProvider(autoLoad: false);
-    await provider.load();
     final startedAt = DateTime.now().subtract(const Duration(hours: 2));
     provider.addPainCrisis(
       PainCrisis(
@@ -891,12 +889,22 @@ void main() {
     );
 
     await tester.pumpWidget(
-      previewApp(const CrisisTrackingScreen(), provider: provider),
+      previewApp(
+        const CrisisTrackingScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
     );
     await tester.pumpAndSettle();
 
     final endCrisis = find.widgetWithText(OutlinedButton, 'Mark as ended');
+    await tester.dragUntilVisible(
+      endCrisis,
+      find.byKey(const Key('crisis-tracker-list')),
+      const Offset(0, -300),
+    );
     await tester.ensureVisible(endCrisis);
+    await tester.pumpAndSettle();
     await tester.tap(endCrisis);
     await tester.pumpAndSettle();
 
@@ -909,14 +917,12 @@ void main() {
     );
     expect(completedEvent.title, 'Pain crisis marked as ended');
     expect(completedEvent.severity, 7);
-    expect(
-      find.text('Crisis marked as ended and added to your local timeline.'),
-      findsOneWidget,
-    );
+    expect(find.text('Ended'), findsOneWidget);
 
-    await tester.pumpWidget(
-      previewApp(const HealthTimelineScreen(), provider: provider),
-    );
+    final timelineButton =
+        find.widgetWithText(TextButton, 'View health timeline');
+    await tester.ensureVisible(timelineButton);
+    await tester.tap(timelineButton);
     await tester.pumpAndSettle();
     expect(find.text('Pain crisis marked as ended'), findsOneWidget);
     expect(tester.takeException(), isNull);
