@@ -5,6 +5,7 @@ import '../../models/doctor_profile.dart';
 import '../../providers/care_ui_provider.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
+import 'credential_submission_screen.dart';
 import 'doctor_ui_components.dart';
 
 /// Explains the UI-only professional verification journey.
@@ -168,10 +169,11 @@ class DoctorVerificationStatusScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   FilledButton.icon(
                     onPressed: onSubmitCredentials ??
-                        () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Open the credentials area to add a document.'),
+                        () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CredentialSubmissionScreen(
+                                  verificationStatus: currentStatus,
+                                ),
                               ),
                             ),
                     icon: Icon(needsAction

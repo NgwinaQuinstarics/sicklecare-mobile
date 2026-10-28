@@ -616,6 +616,61 @@ void main() {
     expect(find.text('Emergency card', skipOffstage: false), findsOneWidget);
   });
 
+  testWidgets('verification opens the local credential submission flow',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    provider.updateDoctorProfile(
+      provider.doctorProfile!.copyWith(
+        verificationStatus: DoctorVerificationStatus.pending,
+        credentials: const [],
+      ),
+    );
+
+    await tester.pumpWidget(
+      previewApp(
+        const DoctorVerificationStatusScreen(
+          status: DoctorVerificationStatus.pending,
+        ),
+        provider: provider,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final addCredentials =
+        find.widgetWithText(FilledButton, 'Add credentials');
+    await tester.scrollUntilVisible(
+      addCredentials,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(addCredentials);
+    await tester.pumpAndSettle();
+    expect(find.text('Submit credentials'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Issuing organisation'),
+      'Preview Medical Council',
+    );
+    final attachDocument =
+        find.widgetWithText(OutlinedButton, 'Attach preview document');
+    await tester.ensureVisible(attachDocument);
+    await tester.tap(attachDocument);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('medical_licence.pdf'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Add for review'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Add for review'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(provider.doctorProfile!.credentials, hasLength(1));
+    expect(find.text('Professional verification'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('emergency information opens prefiltered emergency care',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 800));
