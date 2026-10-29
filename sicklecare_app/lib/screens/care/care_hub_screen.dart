@@ -6,6 +6,7 @@ import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
 import '../facilities/facilities_screen.dart';
 import 'crisis_tracking_screen.dart';
+import 'education_library_screen.dart';
 import 'emergency_information_screen.dart';
 import 'health_timeline_screen.dart';
 import 'medication_hydration_screen.dart';
@@ -121,6 +122,16 @@ class CareHubScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                         builder: (_) => const HealthTimelineScreen()),
+                  ),
+                ),
+                _CareLink(
+                  icon: Icons.menu_book_outlined,
+                  title: 'Learning & support',
+                  subtitle: 'Prepare for visits and review planned topics',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const EducationLibraryScreen(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

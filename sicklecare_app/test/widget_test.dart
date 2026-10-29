@@ -12,6 +12,7 @@ import 'package:sicklecare_app/providers/care_ui_provider.dart';
 import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
+import 'package:sicklecare_app/screens/care/education_library_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
 import 'package:sicklecare_app/screens/care/health_timeline_screen.dart';
 import 'package:sicklecare_app/screens/care/medication_hydration_screen.dart';
@@ -369,10 +370,88 @@ void main() {
       find.text('Medicines & hydration', skipOffstage: false),
       findsOneWidget,
     );
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Learning & support'),
+      300,
+      scrollable: scrollable,
+    );
+    expect(find.text('Learning & support'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Emergency information'),
+      300,
+      scrollable: scrollable,
+    );
     expect(
-      find.text('Emergency information', skipOffstage: false),
+      find.text('Emergency information'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('learning library keeps topics local and ready for review',
+      (tester) async {
+    await tester.pumpWidget(previewApp(const EducationLibraryScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Learning-library preview'), findsOneWidget);
+    expect(find.text('Prepare for a visit'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('learning-category-visit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Everyday check-ins', skipOffstage: false), findsNothing);
+
+    final visitTopic = find.byKey(const Key('learning-topic-visit-prep'));
+    await tester.scrollUntilVisible(
+      visitTopic,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(visitTopic);
+    await tester.pumpAndSettle();
+    await tester.tap(visitTopic);
+    await tester.pumpAndSettle();
+    expect(find.text('What you can prepare'), findsOneWidget);
+    expect(find.text('Editorial review required'), findsOneWidget);
+
+    final markRead = find.byKey(const Key('learning-topic-read-visit-prep'));
+    await tester.ensureVisible(markRead);
+    await tester.pumpAndSettle();
+    await tester.tap(markRead);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Marked as reviewed for this preview session.'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Sources & review'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Sources & review'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'learning library stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      previewApp(
+        const EducationLibraryScreen(),
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final sources = find.text('Sources & review');
+    await tester.scrollUntilVisible(
+      sources,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(sources, findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

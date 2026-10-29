@@ -14,6 +14,7 @@ import 'support_screen.dart';
 import 'settings/settings_screen.dart';
 import 'admin/admin_screen.dart';
 import 'care/care_hub_screen.dart';
+import 'care/education_library_screen.dart';
 
 /// Home dashboard tab: greeting + today's snapshot (hydration, pain, next
 /// reminder) + quick actions + secondary "explore" shortcuts.
@@ -339,6 +340,20 @@ class DashboardScreen extends StatelessWidget {
               ),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CareHubScreen()),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _ExploreTile(
+              icon: Icons.menu_book_outlined,
+              title: l.tr('Learning & support', 'Apprendre & se préparer'),
+              subtitle: l.tr(
+                'Prepare for care visits and review planned topics',
+                'Prépare tes visites et consulte les thèmes prévus',
+              ),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const EducationLibraryScreen(),
+                ),
               ),
             ),
             const SizedBox(height: 10),
