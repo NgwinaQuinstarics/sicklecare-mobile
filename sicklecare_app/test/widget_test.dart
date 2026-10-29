@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:sicklecare_app/data/care_ui_repository.dart';
 import 'package:sicklecare_app/login.dart';
+import 'package:sicklecare_app/signup.dart';
 import 'package:sicklecare_app/models/doctor_profile.dart';
 import 'package:sicklecare_app/models/health_tracking.dart';
 import 'package:sicklecare_app/models/healthcare_facility.dart';
@@ -113,6 +114,58 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Sign in'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
+  });
+
+  testWidgets(
+      'warrior registration is role-specific and returns directly to sign in',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(previewApp(const LoginScreen()));
+
+    await tester.tap(find.text('Sign up'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create warrior account'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SignupScreen), findsOneWidget);
+    expect(find.text('Warrior account'), findsOneWidget);
+    expect(find.text('Genotype (optional)'), findsOneWidget);
+
+    final scrollable = find.byType(Scrollable).first;
+    final returnToSignIn = find.text('Already have an account? Sign in');
+    await tester.scrollUntilVisible(
+      returnToSignIn,
+      300,
+      scrollable: scrollable,
+    );
+    await tester.tap(returnToSignIn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('warrior registration stays usable with larger text',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      previewApp(
+        const SignupScreen(),
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final genotype = find.byKey(const Key('warrior-signup-genotype'));
+    await tester.scrollUntilVisible(
+      genotype,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(genotype, findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('doctor registration presents its professional form',

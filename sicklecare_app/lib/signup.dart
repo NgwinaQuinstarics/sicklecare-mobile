@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'l10n/strings.dart';
 import 'constants/app_strings.dart';
 import 'auth_gate.dart';
+import 'widgets/section_card.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -107,6 +108,7 @@ class _SignupScreenState extends State<SignupScreen> {
       }
       _finishSignup();
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       final msg = e.message?.toLowerCase() ?? '';
       if (e.code == 'network-request-failed' ||
           msg.contains('failed to connect') ||
@@ -114,9 +116,10 @@ class _SignupScreenState extends State<SignupScreen> {
           msg.contains('socketexception')) {
         setState(() => _error = context.l10n.networkError);
       } else {
-        setState(() => _error = e.message);
+        setState(() => _error = _signupErrorMessage(e, l));
       }
     } catch (e) {
+      if (!mounted) return;
       final str = e.toString().toLowerCase();
       if (str.contains('pigeonuserdetails')) {
         // Known bug in firebase_auth 4.16.0 on Android, but user is actually successfully created.
@@ -137,6 +140,34 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  String _signupErrorMessage(FirebaseAuthException error, L10n l) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return l.tr(
+          'An account already uses this email. Try signing in instead.',
+          'Un compte utilise déjà cet e-mail. Essaie plutôt de te connecter.',
+        );
+      case 'invalid-email':
+        return l.validEmail;
+      case 'weak-password':
+        return l.tr(
+          'Choose a password with at least 6 characters.',
+          'Choisis un mot de passe d’au moins 6 caractères.',
+        );
+      case 'operation-not-allowed':
+        return l.tr(
+          'Account creation is unavailable right now. Please try again later.',
+          'La création de compte est indisponible pour le moment. Réessaie plus tard.',
+        );
+      default:
+        return error.message ??
+            l.tr(
+              'We could not create your account. Please try again.',
+              'Nous n’avons pas pu créer ton compte. Réessaie.',
+            );
+    }
+  }
+
   /// Starts a fresh authenticated navigation stack after account creation.
   /// This removes the signup and role-selection routes, preventing Back from
   /// reopening onboarding after the account is already active.
@@ -148,12 +179,20 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  /// Returns to the existing sign-in route without asking a warrior to walk
+  /// back through role selection first.
+  void _returnToSignIn() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: Text(l.createAccount)),
+      appBar: AppBar(
+        title: Text(l.tr('Create warrior account', 'Créer un compte warrior')),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -180,9 +219,68 @@ class _SignupScreenState extends State<SignupScreen> {
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                             fontSize: 24, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text(
+                      l.tr(
+                        'A personal space for your everyday care planning.',
+                        'Un espace personnel pour organiser tes soins au quotidien.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 18),
+                    SectionCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.favorite_outline,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l.tr('Warrior account', 'Compte warrior'),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  l.tr(
+                                    'Start with the basics. You can review health details later in your profile.',
+                                    'Commence par l’essentiel. Tu pourras revoir tes informations de santé plus tard dans ton profil.',
+                                  ),
+                                  style: TextStyle(
+                                    color: cs.onSurfaceVariant,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _name,
+                      enabled: !_loading,
+                      autofillHints: const [AutofillHints.name],
+                      textCapitalization: TextCapitalization.words,
                       decoration: InputDecoration(
                         labelText: l.fullName,
                         prefixIcon: const Icon(Icons.person_outline),
@@ -193,6 +291,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _email,
+                      enabled: !_loading,
+                      autofillHints: const [AutofillHints.email],
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         labelText: l.email,
@@ -203,15 +303,29 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
+                      key: const Key('warrior-signup-genotype'),
                       controller: _genotype,
+                      enabled: !_loading,
+                      textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
-                        labelText: l.genotypeHint,
+                        labelText: l.tr(
+                          'Genotype (optional)',
+                          'Génotype (facultatif)',
+                        ),
+                        helperText: l.tr(
+                          'You can add or update this later.',
+                          'Tu peux l’ajouter ou le modifier plus tard.',
+                        ),
                         prefixIcon: const Icon(Icons.science_outlined),
                       ),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _pass,
+                      enabled: !_loading,
+                      autofillHints: const [AutofillHints.newPassword],
+                      enableSuggestions: false,
+                      autocorrect: false,
                       obscureText: _obscure,
                       decoration: InputDecoration(
                         labelText: l.password,
@@ -231,8 +345,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       children: [
                         Checkbox(
                           value: _acceptTerms,
-                          onChanged: (v) =>
-                              setState(() => _acceptTerms = v ?? false),
+                          onChanged: _loading
+                              ? null
+                              : (v) =>
+                                  setState(() => _acceptTerms = v ?? false),
                         ),
                         Expanded(
                           child: Text.rich(TextSpan(children: [
@@ -266,6 +382,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ],
                     const SizedBox(height: 14),
                     FilledButton(
+                      key: const Key('warrior-signup-submit'),
                       onPressed: _loading ? null : _signup,
                       child: _loading
                           ? const SizedBox(
@@ -273,6 +390,17 @@ class _SignupScreenState extends State<SignupScreen> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2))
                           : Text(l.createAccount),
+                    ),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _loading ? null : _returnToSignIn,
+                        icon: const Icon(Icons.login_outlined),
+                        label: Text(l.tr(
+                          'Already have an account? Sign in',
+                          'Tu as déjà un compte ? Connecte-toi',
+                        )),
+                      ),
                     ),
                   ],
                 ),
