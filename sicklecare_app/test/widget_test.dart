@@ -419,6 +419,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final hydrationInterval =
+        find.byKey(const Key('hydration-reminder-interval'));
+    await tester.scrollUntilVisible(
+      hydrationInterval,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(hydrationInterval, findsOneWidget);
+
     final medicationName = provider.activeMedications.first.name;
     final medicationCard = find.text(medicationName);
     await tester.scrollUntilVisible(
@@ -444,8 +453,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final skippedButton = find.widgetWithText(OutlinedButton, 'Skipped').first;
-    await tester.ensureVisible(skippedButton);
+    final skippedButton = find.byKey(
+      Key('medication-dose-${provider.activeMedications.first.id}-skipped'),
+    );
+    await tester.scrollUntilVisible(
+      skippedButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(skippedButton);
     await tester.pump();
@@ -458,13 +473,56 @@ void main() {
     );
     expect(find.text('Skipped recorded in this preview.'), findsOneWidget);
 
-    final historyButton = find.widgetWithText(TextButton, 'View history').first;
-    await tester.ensureVisible(historyButton);
+    final historyButton = find.byKey(
+      Key('medication-history-${provider.activeMedications.first.id}'),
+    );
+    await tester.scrollUntilVisible(
+      historyButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(historyButton);
     await tester.pumpAndSettle();
 
     expect(find.byType(HealthTimelineScreen), findsOneWidget);
     expect(find.text('$medicationName marked as skipped'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('hydration reminder can be paused and reconfigured locally',
+      (tester) async {
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        const MedicationHydrationScreen(),
+        provider: provider,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final reminderSwitch = find.byKey(const Key('hydration-reminder-switch'));
+    expect(find.text('Every 2 hours in this UI preview'), findsOneWidget);
+    await tester.tap(reminderSwitch);
+    await tester.pumpAndSettle();
+
+    expect(provider.hydrationReminderEnabled, isFalse);
+    expect(find.text('Paused for this UI preview session'), findsOneWidget);
+
+    await tester.tap(reminderSwitch);
+    await tester.pumpAndSettle();
+    final intervalButton = find.byKey(const Key('hydration-reminder-interval'));
+    await tester.ensureVisible(intervalButton);
+    await tester.pumpAndSettle();
+    await tester.tap(intervalButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('hydration-reminder-3h')));
+    await tester.pumpAndSettle();
+
+    expect(provider.hydrationReminderIntervalHours, 3);
+    expect(find.text('Every 3 hours in this UI preview'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

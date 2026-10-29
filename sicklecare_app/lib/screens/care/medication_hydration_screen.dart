@@ -12,6 +12,76 @@ import 'health_timeline_screen.dart';
 class MedicationHydrationScreen extends StatelessWidget {
   const MedicationHydrationScreen({super.key});
 
+  Future<void> _configureHydrationReminder(BuildContext context) async {
+    final care = context.read<CareUiProvider>();
+    final interval = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.85,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hydration reminder schedule',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Choose how often this UI preview would remind you. This does not create a device notification.',
+                  style: TextStyle(
+                    color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final hours in const [1, 2, 3, 4])
+                      ChoiceChip(
+                        key: Key('hydration-reminder-${hours}h'),
+                        label: Text(_hydrationIntervalLabel(hours)),
+                        selected: care.hydrationReminderIntervalHours == hours,
+                        onSelected: (_) => Navigator.pop(sheetContext, hours),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (interval != null && context.mounted) {
+      context
+          .read<CareUiProvider>()
+          .setHydrationReminderIntervalHours(interval);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Hydration reminder set to ${_hydrationIntervalLabel(interval).toLowerCase()} in this preview.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _addMedication(BuildContext context) async {
     final name = TextEditingController();
     final dosage = TextEditingController();
@@ -229,6 +299,30 @@ class MedicationHydrationScreen extends StatelessWidget {
                             ),
                         ],
                       ),
+                      const Divider(height: 28),
+                      SwitchListTile.adaptive(
+                        key: const Key('hydration-reminder-switch'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Hydration reminder'),
+                        subtitle: Text(
+                          care.hydrationReminderEnabled
+                              ? '${_hydrationIntervalLabel(care.hydrationReminderIntervalHours)} in this UI preview'
+                              : 'Paused for this UI preview session',
+                        ),
+                        value: care.hydrationReminderEnabled,
+                        onChanged: care.setHydrationReminderEnabled,
+                      ),
+                      if (care.hydrationReminderEnabled)
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: TextButton.icon(
+                            key: const Key('hydration-reminder-interval'),
+                            onPressed: () =>
+                                _configureHydrationReminder(context),
+                            icon: const Icon(Icons.schedule_outlined),
+                            label: const Text('Change interval'),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -278,6 +372,10 @@ class MedicationHydrationScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _hydrationIntervalLabel(int hours) {
+  return hours == 1 ? 'Every hour' : 'Every $hours hours';
 }
 
 class _MedicationCard extends StatelessWidget {
@@ -364,6 +462,7 @@ class _MedicationCard extends StatelessWidget {
             children: [
               for (final status in MedicationDoseStatus.values)
                 _DoseStatusButton(
+                  key: Key('medication-dose-${medication.id}-${status.name}'),
                   status: status,
                   onPressed: () {
                     care.recordMedicationDose(medication.id, status);
@@ -379,6 +478,7 @@ class _MedicationCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           TextButton.icon(
+            key: Key('medication-history-${medication.id}'),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const HealthTimelineScreen(
@@ -397,6 +497,7 @@ class _MedicationCard extends StatelessWidget {
 
 class _DoseStatusButton extends StatelessWidget {
   const _DoseStatusButton({
+    super.key,
     required this.status,
     required this.onPressed,
   });

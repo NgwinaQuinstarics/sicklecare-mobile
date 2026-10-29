@@ -37,6 +37,8 @@ class CareUiProvider extends ChangeNotifier {
   List<PainCrisis> _painCrises = [];
   List<HealthTimelineEvent> _timeline = [];
   int _hydrationTodayMl = 0;
+  bool _hydrationReminderEnabled = true;
+  int _hydrationReminderIntervalHours = 2;
 
   String _facilitySearchQuery = '';
   FacilityType? _facilityTypeFilter;
@@ -61,6 +63,8 @@ class CareUiProvider extends ChangeNotifier {
   bool get emergencyFacilitiesOnly => _emergencyFacilitiesOnly;
   int get hydrationTodayMl => _hydrationTodayMl;
   int get hydrationGoalMl => _warriorProfile?.hydrationGoalMl ?? 2500;
+  bool get hydrationReminderEnabled => _hydrationReminderEnabled;
+  int get hydrationReminderIntervalHours => _hydrationReminderIntervalHours;
 
   double get hydrationProgress {
     if (hydrationGoalMl <= 0) {
@@ -133,6 +137,22 @@ class CareUiProvider extends ChangeNotifier {
   }
 
   Future<void> retry() => load(force: true);
+
+  void setHydrationReminderEnabled(bool enabled) {
+    if (_hydrationReminderEnabled == enabled) {
+      return;
+    }
+    _hydrationReminderEnabled = enabled;
+    notifyListeners();
+  }
+
+  void setHydrationReminderIntervalHours(int hours) {
+    if (hours < 1 || hours > 4 || _hydrationReminderIntervalHours == hours) {
+      return;
+    }
+    _hydrationReminderIntervalHours = hours;
+    notifyListeners();
+  }
 
   void clearError() {
     if (_errorMessage == null) {
