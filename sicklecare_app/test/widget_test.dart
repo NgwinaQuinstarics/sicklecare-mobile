@@ -10,6 +10,7 @@ import 'package:sicklecare_app/models/health_tracking.dart';
 import 'package:sicklecare_app/models/healthcare_facility.dart';
 import 'package:sicklecare_app/providers/care_ui_provider.dart';
 import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
+import 'package:sicklecare_app/screens/care/appointment_request_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/education_library_screen.dart';
@@ -372,6 +373,12 @@ void main() {
     );
     final scrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
+      find.text('Appointments'),
+      300,
+      scrollable: scrollable,
+    );
+    expect(find.text('Appointments'), findsOneWidget);
+    await tester.scrollUntilVisible(
       find.text('Learning & support'),
       300,
       scrollable: scrollable,
@@ -428,6 +435,108 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Sources & review'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('appointment requests validate and stay in the local preview',
+      (tester) async {
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    await tester.pumpWidget(
+      previewApp(const AppointmentRequestScreen(), provider: provider),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('No appointment requests yet'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('No appointment requests yet'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('appointment-request-cta')));
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const Key('appointment-request-submit'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a facility.'), findsOneWidget);
+    expect(find.text('Choose a care team.'), findsOneWidget);
+    expect(find.text('Choose a preferred timing.'), findsOneWidget);
+
+    final facility = find.byKey(const Key('appointment-facility-select'));
+    await tester.ensureVisible(facility);
+    await tester.tap(facility);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SickleCare Preview Hospital').last);
+    await tester.pumpAndSettle();
+
+    final team = find.byKey(const Key('appointment-team-select'));
+    await tester.ensureVisible(team);
+    await tester.tap(team);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Care team · next available (preview)').last,
+    );
+    await tester.pumpAndSettle();
+
+    final timing = find.byKey(const Key('appointment-timing-next-available'));
+    await tester.ensureVisible(timing);
+    await tester.tap(timing);
+    await tester.pumpAndSettle();
+    final note = find.byKey(const Key('appointment-note-field'));
+    await tester.ensureVisible(note);
+    await tester.enterText(note, 'Discuss next care visit');
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pending · preview'), findsOneWidget);
+    expect(find.text('Discuss next care visit'), findsOneWidget);
+    expect(
+      find.text('Appointment request saved in this preview session.'),
+      findsOneWidget,
+    );
+    expect(
+      provider.timeline.any(
+        (event) => event.type == HealthTimelineEventType.appointment,
+      ),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'appointment request stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    await tester.pumpWidget(
+      previewApp(
+        const AppointmentRequestScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final request = find.byKey(const Key('appointment-request-cta'));
+    await tester.scrollUntilVisible(
+      request,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(request);
+    await tester.pumpAndSettle();
+    expect(request, findsOneWidget);
+    await tester.tap(request);
+    await tester.pumpAndSettle();
+    expect(find.text('Preferred facility'), findsOneWidget);
+    final submit = find.byKey(const Key('appointment-request-submit'));
+    await tester.ensureVisible(submit);
+    expect(submit, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

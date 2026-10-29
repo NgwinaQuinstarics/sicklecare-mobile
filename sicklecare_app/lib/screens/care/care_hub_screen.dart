@@ -5,6 +5,7 @@ import '../../providers/care_ui_provider.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
 import '../facilities/facilities_screen.dart';
+import 'appointment_request_screen.dart';
 import 'crisis_tracking_screen.dart';
 import 'education_library_screen.dart';
 import 'emergency_information_screen.dart';
@@ -122,6 +123,16 @@ class CareHubScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                         builder: (_) => const HealthTimelineScreen()),
+                  ),
+                ),
+                _CareLink(
+                  icon: Icons.calendar_month_outlined,
+                  title: 'Appointments',
+                  subtitle: 'Create a local request preview for your care team',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AppointmentRequestScreen(),
+                    ),
                   ),
                 ),
                 _CareLink(
