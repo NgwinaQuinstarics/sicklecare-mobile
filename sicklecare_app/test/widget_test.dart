@@ -13,6 +13,8 @@ import 'package:sicklecare_app/screens/auth/role_selection_screen.dart';
 import 'package:sicklecare_app/screens/care/care_hub_screen.dart';
 import 'package:sicklecare_app/screens/care/crisis_tracking_screen.dart';
 import 'package:sicklecare_app/screens/care/emergency_information_screen.dart';
+import 'package:sicklecare_app/screens/care/health_timeline_screen.dart';
+import 'package:sicklecare_app/screens/care/medication_hydration_screen.dart';
 import 'package:sicklecare_app/screens/care/warrior_health_profile_screen.dart';
 import 'package:sicklecare_app/screens/doctor/credential_submission_screen.dart';
 import 'package:sicklecare_app/screens/doctor/doctor_dashboard_screen.dart';
@@ -397,6 +399,72 @@ void main() {
       scrollable: scrollable,
     );
     expect(find.text('Known triggers (comma-separated)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'medication and hydration stays usable with larger text on a narrow phone',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+
+    await tester.pumpWidget(
+      previewApp(
+        const MedicationHydrationScreen(),
+        provider: provider,
+        textScaler: TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final medicationName = provider.activeMedications.first.name;
+    final medicationCard = find.text(medicationName);
+    await tester.scrollUntilVisible(
+      medicationCard,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(medicationCard, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('medication dose statuses appear in medication history',
+      (tester) async {
+    final provider = CareUiProvider(autoLoad: false);
+    await provider.load();
+    final medicationName = provider.activeMedications.first.name;
+
+    await tester.pumpWidget(
+      previewApp(
+        const MedicationHydrationScreen(),
+        provider: provider,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final skippedButton = find.widgetWithText(OutlinedButton, 'Skipped').first;
+    await tester.ensureVisible(skippedButton);
+    await tester.pumpAndSettle();
+    await tester.tap(skippedButton);
+    await tester.pump();
+
+    expect(
+      provider.timeline.any(
+        (event) => event.title == '$medicationName marked as skipped',
+      ),
+      isTrue,
+    );
+    expect(find.text('Skipped recorded in this preview.'), findsOneWidget);
+
+    final historyButton = find.widgetWithText(TextButton, 'View history').first;
+    await tester.ensureVisible(historyButton);
+    await tester.tap(historyButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HealthTimelineScreen), findsOneWidget);
+    expect(find.text('$medicationName marked as skipped'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

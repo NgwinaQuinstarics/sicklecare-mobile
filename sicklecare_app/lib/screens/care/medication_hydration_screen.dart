@@ -6,6 +6,7 @@ import '../../providers/care_ui_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/status_banner.dart';
+import 'health_timeline_screen.dart';
 
 /// Medication reminder and hydration UI backed only by the mock care provider.
 class MedicationHydrationScreen extends StatelessWidget {
@@ -349,21 +350,80 @@ class _MedicationCard extends StatelessWidget {
             value: medication.reminderEnabled,
             onChanged: (_) => care.toggleMedicationReminder(medication.id),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Dose status',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final status in MedicationDoseStatus.values)
+                _DoseStatusButton(
+                  status: status,
+                  onPressed: () {
+                    care.recordMedicationDose(medication.id, status);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('${status.label} recorded in this preview.'),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
           const SizedBox(height: 4),
-          FilledButton.tonalIcon(
-            onPressed: () {
-              care.markMedicationTaken(medication.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content:
-                        Text('${medication.name} marked as taken in preview.')),
-              );
-            },
-            icon: const Icon(Icons.check_circle_outline),
-            label: const Text('Mark as taken'),
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const HealthTimelineScreen(
+                  initialFilter: HealthTimelineEventType.medication,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.history_outlined),
+            label: const Text('View history'),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DoseStatusButton extends StatelessWidget {
+  const _DoseStatusButton({
+    required this.status,
+    required this.onPressed,
+  });
+
+  final MedicationDoseStatus status;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (status) {
+      MedicationDoseStatus.taken => Icons.check_circle_outline,
+      MedicationDoseStatus.skipped => Icons.redo_outlined,
+      MedicationDoseStatus.missed => Icons.schedule_outlined,
+    };
+
+    if (status == MedicationDoseStatus.taken) {
+      return FilledButton.tonalIcon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(status.label),
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(status.label),
     );
   }
 }

@@ -43,6 +43,24 @@ class MedicationPlan {
   }
 }
 
+/// A user-reported medication status kept in the local UI timeline.
+///
+/// This is deliberately a record of an interaction, not advice about whether
+/// someone should take, skip, or change a prescribed medicine.
+enum MedicationDoseStatus {
+  taken(label: 'Taken', timelineVerb: 'taken'),
+  skipped(label: 'Skipped', timelineVerb: 'skipped'),
+  missed(label: 'Missed', timelineVerb: 'missed');
+
+  const MedicationDoseStatus({
+    required this.label,
+    required this.timelineVerb,
+  });
+
+  final String label;
+  final String timelineVerb;
+}
+
 /// A presentation-level crisis log. It does not encode a clinical assessment.
 class PainCrisis {
   const PainCrisis({

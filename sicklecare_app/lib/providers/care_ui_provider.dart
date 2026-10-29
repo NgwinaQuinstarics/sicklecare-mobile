@@ -339,6 +339,18 @@ class CareUiProvider extends ChangeNotifier {
   }
 
   void markMedicationTaken(String medicationId, {DateTime? occurredAt}) {
+    recordMedicationDose(
+      medicationId,
+      MedicationDoseStatus.taken,
+      occurredAt: occurredAt,
+    );
+  }
+
+  void recordMedicationDose(
+    String medicationId,
+    MedicationDoseStatus status, {
+    DateTime? occurredAt,
+  }) {
     final medication = _medications.cast<MedicationPlan?>().firstWhere(
           (item) => item?.id == medicationId,
           orElse: () => null,
@@ -346,12 +358,13 @@ class CareUiProvider extends ChangeNotifier {
     if (medication == null) {
       return;
     }
+    final timestamp = occurredAt ?? DateTime.now();
     _addTimelineEvent(
       HealthTimelineEvent(
-        id: 'medication-$medicationId-${(occurredAt ?? DateTime.now()).millisecondsSinceEpoch}',
-        occurredAt: occurredAt ?? DateTime.now(),
+        id: 'medication-${status.name}-$medicationId-${timestamp.microsecondsSinceEpoch}',
+        occurredAt: timestamp,
         type: HealthTimelineEventType.medication,
-        title: '${medication.name} marked as taken',
+        title: '${medication.name} marked as ${status.timelineVerb}',
         description: '${medication.dosage} · ${medication.scheduleLabel}',
       ),
     );

@@ -9,14 +9,22 @@ import '../../widgets/status_banner.dart';
 
 /// Consolidated UI timeline for mock health, medication and hydration events.
 class HealthTimelineScreen extends StatefulWidget {
-  const HealthTimelineScreen({super.key});
+  const HealthTimelineScreen({super.key, this.initialFilter});
+
+  final HealthTimelineEventType? initialFilter;
 
   @override
   State<HealthTimelineScreen> createState() => _HealthTimelineScreenState();
 }
 
 class _HealthTimelineScreenState extends State<HealthTimelineScreen> {
-  HealthTimelineEventType? _filter;
+  late HealthTimelineEventType? _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.initialFilter;
+  }
 
   @override
   Widget build(BuildContext context) {
