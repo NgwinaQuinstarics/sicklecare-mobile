@@ -92,6 +92,10 @@ class _AIChatScreenState extends State<AIChatScreen> {
   Future<void> _send([String? preset]) async {
     final textValue = (preset ?? _ctl.text).trim();
     if (textValue.isEmpty || _loading) return;
+    final allowOnline = AIService.requiresLocalReply(textValue)
+        ? false
+        : await _confirmOnlineAi();
+    if (!mounted) return;
     if (_listening) {
       await _speech.stop();
       _listening = false;
@@ -113,6 +117,7 @@ class _AIChatScreenState extends State<AIChatScreen> {
       history:
           history.length > 1 ? history.sublist(0, history.length - 1) : null,
       healthContext: _buildHealthContext(),
+      allowOnline: allowOnline,
     );
 
     if (!mounted) return;
@@ -123,6 +128,36 @@ class _AIChatScreenState extends State<AIChatScreen> {
     });
     _persist();
     _scrollToEnd();
+  }
+
+  Future<bool> _confirmOnlineAi() async {
+    if (_box.get('sika_cloud_ai_consent_v1') == true) return true;
+    final l = context.l10n;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.tr('Use online Sika?', 'Utiliser Sika en ligne ?')),
+        content: Text(l.tr(
+          'If you continue, your message and up to six recent chat messages will be sent to Groq through Firebase to generate a reply. Your tracker, profile and reminders are not attached automatically. Avoid names and other identifying details. You can choose a local reply instead.',
+          'Si tu continues, ton message et jusqu’à six messages récents seront envoyés à Groq via Firebase pour générer une réponse. Tes check-ins, ton profil et tes rappels ne sont pas joints automatiquement. Évite les noms et autres informations identifiantes. Tu peux choisir une réponse locale.',
+        )),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l.tr('Use local reply', 'Réponse locale')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l.tr('Continue online', 'Continuer en ligne')),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true) {
+      await _box.put('sika_cloud_ai_consent_v1', true);
+      return true;
+    }
+    return false;
   }
 
   Future<void> _toggleMic() async {
@@ -605,8 +640,8 @@ class _Welcome extends StatelessWidget {
                           Text(
                             dailyAdvice ??
                                 l.tr(
-                                  'Log a check-in today so Sika can personalize your advice.',
-                                  "Enregistre un check-in aujourd'hui pour personnaliser le conseil de Sika.",
+                                  'Sika gives general tips. Your check-ins stay on this device.',
+                                  'Sika donne des conseils généraux. Tes check-ins restent sur cet appareil.',
                                 ),
                             style: TextStyle(
                               color: isDark

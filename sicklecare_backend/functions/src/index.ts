@@ -11,6 +11,7 @@ import { notificationFunctions } from './notifications';
 import { analyticsFunctions } from './analytics';
 import { reportFunctions } from './reports';
 import { utilityFunctions } from './utils';
+import { askSika } from './sika';
 
 // Export all functions
 export const {
@@ -47,6 +48,8 @@ export const {
   sendEmail,
   validateApiKey,
 } = utilityFunctions;
+
+export { askSika };
 
 // HTTP endpoints for webhooks and external integrations
 export const api = functions.https.onRequest(async (req, res) => {

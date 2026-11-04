@@ -1,5 +1,27 @@
 # SickleCare Firebase Backend
 
+## Current implementation checkpoint
+
+The `functions/` directory under this backend is the canonical Functions
+codebase in `firebase.json`. The separate `sicklecare_app/functions/` package
+was removed after confirming it was not connected to the app's Firebase deploy
+configuration. The password reset screen now uses Firebase Auth's built-in
+reset email flow.
+
+Sika's online requests use the authenticated `askSika` callable in
+`functions/src/sika/`. It requires App Check, validates bounded user/assistant
+messages, limits each account to 10 requests per minute, and reads the provider
+key from the `GROQ_API_KEY` Secret Manager parameter. The Flutter client asks
+the user before sending chat text and recent turns online, and provides a
+Settings control to revoke that consent. Tracker, profile,
+reminder and local daily-advice context are not attached to that request. The
+client keeps emergency responses and an offline fallback.
+
+This source checkpoint has not been deployed. Before any deployment, confirm
+the Firebase project and authorized operator, configure the secret in the
+selected project, and review provider privacy terms and the user-facing AI
+disclosure. A source build does not establish deployed behavior.
+
 This is the Firebase backend for the SickleCare mobile application. It extends the existing Firebase setup with Cloud Functions, enhanced security rules, and additional Firebase services.
 
 ## 🔥 Existing Firebase Setup

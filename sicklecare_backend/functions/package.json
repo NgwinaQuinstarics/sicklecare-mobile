@@ -13,27 +13,27 @@
     "logs": "firebase functions:log",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "npm run build && node --test test/sika-validation.test.js",
+    "test:watch": "node --test --watch test/sika-validation.test.js"
   },
   "engines": {
     "node": "18"
   },
   "dependencies": {
+    "axios": "^1.5.1",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.1.1",
+    "express": "^4.18.2",
     "firebase-admin": "^11.11.0",
     "firebase-functions": "^4.5.0",
+    "googleapis": "^127.0.0",
+    "helmet": "^7.0.0",
     "moment": "^2.29.4",
-    "crypto-js": "^4.1.1",
-    "uuid": "^9.0.1",
-    "axios": "^1.5.1",
     "nodemailer": "^6.9.7",
     "pdfkit": "^0.14.0",
-    "twilio": "^4.19.2",
     "stripe": "^14.11.0",
-    "googleapis": "^127.0.0",
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0"
+    "twilio": "^4.19.2",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
@@ -41,10 +41,7 @@
     "@typescript-eslint/parser": "^6.8.0",
     "eslint": "^8.51.0",
     "eslint-config-google": "^0.14.0",
-    "typescript": "^5.2.2",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.1",
-    "@types/jest": "^29.5.6"
+    "typescript": "^5.2.2"
   },
   "private": true
 }

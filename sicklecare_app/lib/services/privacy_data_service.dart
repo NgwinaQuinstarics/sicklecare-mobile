@@ -55,6 +55,7 @@ class PrivacyDataService {
       'sika_chat',
       'user_groq_api_key',
       'user_openai_api_key',
+      'sika_cloud_ai_consent_v1',
     ]);
   }
 

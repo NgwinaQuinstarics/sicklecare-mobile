@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
+import 'package:hive/hive.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/strings.dart';
@@ -25,10 +26,15 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _version = '';
   List<EmergencyContact> _emergencyContacts = const [];
+  bool _allowOnlineSika = false;
 
   @override
   void initState() {
     super.initState();
+    try {
+      _allowOnlineSika =
+          Hive.box('app_cache').get('sika_cloud_ai_consent_v1') == true;
+    } catch (_) {}
     PackageInfo.fromPlatform().then((p) {
       if (mounted) setState(() => _version = '${p.version}+${p.buildNumber}');
     }).catchError((_) {});
@@ -61,6 +67,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _openWebsite() => _launch(AppStrings.websiteUrl);
   Future<void> _openTerms() => _launch(AppStrings.termsUrl);
   Future<void> _openPrivacy() => _launch(AppStrings.privacyUrl);
+
+  Future<void> _setOnlineSikaConsent(bool enabled) async {
+    const key = 'sika_cloud_ai_consent_v1';
+    if (enabled) {
+      final l = context.l10n;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l.tr('Use online Sika?', 'Utiliser Sika en ligne ?')),
+          content: Text(l.tr(
+            'Your message and up to six recent chat messages will be sent to Groq through Firebase. Tracker, profile and reminder data are not attached automatically. Avoid names and other identifying details.',
+            'Ton message et jusqu’à six messages récents seront envoyés à Groq via Firebase. Tes check-ins, ton profil et tes rappels ne sont pas joints automatiquement. Évite les noms et autres informations identifiantes.',
+          )),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l.tr('Continue online', 'Continuer en ligne')),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true) return;
+      await Hive.box('app_cache').put(key, true);
+    } else {
+      await Hive.box('app_cache').delete(key);
+    }
+    if (mounted) setState(() => _allowOnlineSika = enabled);
+  }
 
   Future<void> _exportLocalData() async {
     final l = context.l10n;
@@ -107,7 +145,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       await trackerProvider.load();
       await reminderProvider.load();
-      setState(() => _emergencyContacts = const []);
+      setState(() {
+        _emergencyContacts = const [];
+        _allowOnlineSika = false;
+      });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -322,6 +363,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'App Check is enabled and health exports stay user-controlled.',
                     'App Check est activé et les exports santé restent contrôlés par l’utilisateur.',
                   )),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.cloud_outlined),
+                  title: Text(l.tr('Online Sika replies', 'Réponses Sika en ligne')),
+                  subtitle: Text(l.tr(
+                    'Allow chat messages and recent turns to be sent to Groq. You can turn this off at any time.',
+                    'Autoriser l’envoi des messages récents à Groq. Tu peux désactiver cette option à tout moment.',
+                  )),
+                  value: _allowOnlineSika,
+                  onChanged: _setOnlineSikaConsent,
                 ),
                 const Divider(height: 1),
                 ListTile(

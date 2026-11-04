@@ -1,48 +1,15 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:hive/hive.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
-/// AI helper backed by Groq's OpenAI-compatible Chat Completions API.
+/// AI helper backed by the authenticated Sika callable.
 ///
-/// Reads key from Hive (saved by user in-app) or falls back to `.env`.
-/// The assistant is tuned for the CAMEROONIAN context. If no key is configured
-/// or the request fails, it returns a smart, interactive local conversational
-/// fallback so the chat screen always stays fully usable.
+/// Health context stays on device. If the callable is unavailable, a local
+/// conversational fallback keeps the chat usable.
 class AIService {
-  static const _endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-
-  /// Groq production model. Change here if Groq rotates model ids.
-  static const _model = 'llama-3.3-70b-versatile';
-
-  static const _system =
-      'You are Sika, the SickleCare assistant — a warm and practical health '
-      'assistant for people living with sickle cell disease and their '
-      'caregivers in CAMEROON. '
-      'Always ground your advice in the Cameroonian reality:\n'
-      '- Local, affordable foods: ndole, eru/okok, bitterleaf, okra (gombo), '
-      'beans (haricots), groundnuts (arachides), plantain, cassava (manioc), '
-      'sweet potato, moringa, dark leafy greens, oranges, mango, guava, papaya, '
-      'watermelon, pineapple, and baobab juice (bouye).\n'
-      '- Hydration needs in a hot, tropical and dusty harmattan climate.\n'
-      '- The local health system: health centres, district and regional '
-      'hospitals, and CHU.\n'
-      '- Malaria and infections are common crisis triggers locally: encourage '
-      'mosquito nets, prompt treatment of fever, vaccination, folic acid and '
-      'good hydration.\n'
-      'Be concise (short paragraphs or bullet points). ALWAYS reply in the same '
-      'language the user writes in (French or English). Never give a diagnosis. '
-      'Do not prescribe medicine, choose dosages, change treatment, or tell a '
-      'patient to stop/start medication. For those requests, explain that only '
-      'their clinician can decide and suggest sharing their SickleCare report. '
-      'For severe pain, chest pain, difficulty breathing, high fever, or signs '
-      'of stroke, tell them to go to the nearest hospital immediately or call '
-      'local emergency services.';
-
   static Future<String> ask(
     String prompt, {
     List<Map<String, String>>? history,
     String? healthContext,
+    bool allowOnline = true,
   }) async {
     if (_hasEmergencySymptoms(prompt)) {
       return _emergencyReply(prompt);
@@ -50,69 +17,49 @@ class AIService {
     if (_isUnsafeMedicationRequest(prompt)) {
       return _medicalBoundaryReply(prompt);
     }
-
-    String? key;
-    try {
-      final box = Hive.box('app_cache');
-      key = box.get('user_groq_api_key') ?? box.get('user_openai_api_key');
-    } catch (_) {}
-
-    if (key == null || key.isEmpty) {
-      key =
-          dotenv.maybeGet('GROQ_API_KEY') ?? dotenv.maybeGet('OPENAI_API_KEY');
-    }
-
-    if (key == null || key.isEmpty) {
-      return _fallback(prompt, healthContext: healthContext);
-    }
+    if (!allowOnline) return _fallback(prompt, healthContext: healthContext);
 
     try {
-      final system = healthContext == null || healthContext.trim().isEmpty
-          ? _system
-          : '$_system\n\nUse this private user health context to personalize '
-              'your answer. Do not expose private fields unless the user asks. '
-              'Health context:\n$healthContext';
-      final res = await http
-          .post(
-            Uri.parse(_endpoint),
-            headers: {
-              'Authorization': 'Bearer $key',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'model': _model,
-              'messages': [
-                {'role': 'system', 'content': system},
-                ...?history,
-                {'role': 'user', 'content': prompt},
-              ],
-              'temperature': 0.5,
-              'max_tokens': 700,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(res.bodyBytes));
-        final content = data['choices']?[0]?['message']?['content'];
-        if (content is String && content.trim().isNotEmpty) {
-          return content.trim();
-        }
+      final priorMessages = (history ?? const <Map<String, String>>[])
+          .where((message) =>
+              message['role'] == 'user' || message['role'] == 'assistant')
+          .toList(growable: false);
+      final boundedHistory = priorMessages
+          .skip(priorMessages.length > 6 ? priorMessages.length - 6 : 0)
+          .map((message) {
+        final content = (message['content'] ?? '').trim();
+        return {
+          'role': message['role']!,
+          'content': content.length <= 1000 ? content : content.substring(0, 1000),
+        };
+      }).toList(growable: false);
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('askSika')
+          .call({
+        'prompt': prompt,
+        'history': boundedHistory,
+      });
+      final data = result.data;
+      if (data is Map && data['reply'] is String) {
+        final reply = (data['reply'] as String).trim();
+        if (reply.isNotEmpty) return reply;
       }
-      return _fallback(prompt, healthContext: healthContext);
     } catch (_) {
-      return _fallback(prompt, healthContext: healthContext);
+      // Keep emergency guidance and the offline fallback available.
     }
+    return _fallback(prompt, healthContext: healthContext);
   }
 
-  static Future<String> dailyAdvice(String healthContext) {
-    return ask(
-      'Give one short daily reminder or health advice for today. Use the user '
-      'health context, focus on hydration, pain, fever risk, reminders, or '
-      'nutrition. Keep it under 70 words.',
+  static Future<String> dailyAdvice(String healthContext) async {
+    return _fallback(
+      'Give a short general daily reminder about hydration, nutrition, '
+      'infection prevention, or keeping a care-team appointment.',
       healthContext: healthContext,
     );
   }
+
+  static bool requiresLocalReply(String prompt) =>
+      _hasEmergencySymptoms(prompt) || _isUnsafeMedicationRequest(prompt);
 
   /// Cameroon-flavoured offline fallback — purely keyword-based on the user's
   /// message. Never checks healthContext here (that was causing the same-answer
