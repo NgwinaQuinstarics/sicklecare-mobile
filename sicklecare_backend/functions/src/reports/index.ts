@@ -21,43 +21,60 @@ export const generateHealthReport = functions.https.onCall(async (data, context)
   }
 
   const userId = context.auth.uid;
-  const { startDate, endDate, format = 'pdf' } = data;
+  const { startDate, endDate, format = 'json' } = data ?? {};
+
+  if (format !== 'json') {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Only JSON reports are currently supported',
+    );
+  }
+  if (typeof startDate !== 'string' || typeof endDate !== 'string') {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Start date and end date are required',
+    );
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    !Number.isFinite(end.getTime()) ||
+    start > end ||
+    end.getTime() - start.getTime() > 366 * 24 * 60 * 60 * 1000
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'The report date range is invalid or exceeds one year',
+    );
+  }
 
   try {
-    // Validate dates
-    if (!startDate || !endDate) {
-      throw new functions.https.HttpsError(
-        'invalid-argument',
-        'Start date and end date are required'
-      );
-    }
-
     const report = await createHealthReport(
       userId,
-      new Date(startDate),
-      new Date(endDate)
+      start,
+      end,
     );
 
-    // Store report metadata
-    await db.collection('reports').add({
-      userId,
-      title: report.title,
+    const reportRef = db.collection('users').doc(userId)
+      .collection('reports').doc();
+    await reportRef.set({
+      report,
       generatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
+      startDate: admin.firestore.Timestamp.fromDate(start),
+      endDate: admin.firestore.Timestamp.fromDate(end),
       format,
-      size: JSON.stringify(report).length
     });
-
-    console.log(`Health report generated for user: ${userId}`);
 
     return {
       success: true,
       report,
-      downloadUrl: `/api/reports/${userId}/${Date.now()}.${format}`
+      reportId: reportRef.id,
     };
   } catch (error) {
     console.error('Error generating health report:', error);
+    if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError(
       'internal',
       'Failed to generate health report'
@@ -92,8 +109,7 @@ export const sendWeeklyReport = functions.pubsub
 
           const report = await createHealthReport(userId, startDate, endDate);
 
-          // Send via email or notification
-          await sendReportToUser(userId, report, user.email);
+          await sendReportToUser(userId, report);
 
           sentCount++;
         } catch (error) {
@@ -123,15 +139,24 @@ async function createHealthReport(
     const userData = userDoc.data();
 
     // Fetch health data for period
-    const healthSnapshot = await db
+    const entriesSnapshot = await db
       .collection('users')
       .doc(userId)
-      .collection('health')
-      .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(startDate))
-      .where('timestamp', '<=', admin.firestore.Timestamp.fromDate(endDate))
+      .collection('tracker_entries')
+      .where('date', '>=', startDate.toISOString())
+      .where('date', '<=', endDate.toISOString())
+      .orderBy('date', 'asc')
+      .limit(1000)
       .get();
 
-    const healthEntries = healthSnapshot.docs.map(doc => doc.data());
+    if (entriesSnapshot.size === 1000) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'The report contains too many entries; use a shorter date range',
+      );
+    }
+
+    const healthEntries = entriesSnapshot.docs.map(doc => doc.data());
 
     if (healthEntries.length === 0) {
       return {
@@ -149,7 +174,7 @@ async function createHealthReport(
 
     // Calculate statistics
     const painLevels = healthEntries.map(e => e.painLevel);
-    const hydrationLevels = healthEntries.map(e => e.hydration);
+    const hydrationLevels = healthEntries.map(e => e.hydrationMl);
 
     const averagePain = painLevels.reduce((a, b) => a + b, 0) / painLevels.length;
     const averageHydration = hydrationLevels.reduce((a, b) => a + b, 0) / hydrationLevels.length;
@@ -162,20 +187,20 @@ async function createHealthReport(
         end: endDate.toISOString().split('T')[0]
       },
       user: {
-        name: userData?.displayName || 'Patient',
+        name: userData?.name || userData?.displayName || 'Patient',
         email: userData?.email || ''
       },
       summary: {
         totalEntries: healthEntries.length,
         averagePainLevel: Math.round(averagePain * 10) / 10,
-        averageHydration: Math.round(averageHydration * 10) / 10,
+        averageHydrationMl: Math.round(averageHydration),
         maxPainLevel: Math.max(...painLevels),
         minPainLevel: Math.min(...painLevels),
         reportGeneratedAt: new Date().toISOString()
       },
       details: {
         dailyEntries: groupDataByDate(healthEntries),
-        recommendations: generateRecommendations(averagePain, averageHydration)
+        recommendations: generateRecommendations(averagePain)
       }
     };
 
@@ -191,8 +216,7 @@ async function createHealthReport(
  */
 async function sendReportToUser(
   userId: string,
-  report: any,
-  email: string | undefined
+  report: any
 ): Promise<void> {
   try {
     // Store report in user's collection
@@ -202,19 +226,7 @@ async function sendReportToUser(
       read: false
     });
 
-    console.log(`Report stored for user: ${userId}`);
-
-    // In production, send via email service
-    if (email) {
-      console.log(`Weekly report would be sent to: ${email}`);
-      // Example with SendGrid:
-      // await sendGridClient.send({
-      //   to: email,
-      //   from: 'reports@sicklecare.com',
-      //   subject: 'Your Weekly Health Report',
-      //   html: generateReportHTML(report)
-      // });
-    }
+    console.log(`Weekly report stored for user: ${userId}`);
   } catch (error) {
     console.error('Error sending report:', error);
   }
@@ -227,7 +239,7 @@ function groupDataByDate(entries: any[]): { [key: string]: any[] } {
   const grouped: { [key: string]: any[] } = {};
 
   entries.forEach(entry => {
-    const date = entry.timestamp.toDate().toISOString().split('T')[0];
+    const date = entry.date.substring(0, 10);
     if (!grouped[date]) {
       grouped[date] = [];
     }
@@ -240,19 +252,13 @@ function groupDataByDate(entries: any[]): { [key: string]: any[] } {
 /**
  * Helper function to generate recommendations
  */
-function generateRecommendations(avgPain: number, avgHydration: number): string[] {
+function generateRecommendations(avgPain: number): string[] {
   const recommendations: string[] = [];
 
   if (avgPain > 6) {
     recommendations.push('High pain levels detected. Consider consulting with your healthcare provider.');
   } else if (avgPain > 4) {
     recommendations.push('Moderate pain levels. Continue monitoring and follow your pain management plan.');
-  }
-
-  if (avgHydration < 5) {
-    recommendations.push('Low hydration levels. Increase fluid intake to improve health outcomes.');
-  } else if (avgHydration > 8) {
-    recommendations.push('Excellent hydration! Keep up the good work.');
   }
 
   if (recommendations.length === 0) {

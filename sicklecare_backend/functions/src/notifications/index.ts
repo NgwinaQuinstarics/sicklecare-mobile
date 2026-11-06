@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { checkRateLimit } from '../utils';
 
 const db = admin.firestore();
 
@@ -21,25 +22,41 @@ export const scheduleReminders = functions.https.onCall(async (data, context) =>
   }
 
   const userId = context.auth.uid;
-  const { title, type, time, repeat } = data;
+  const { title, type, time, repeat = 'once' } = data ?? {};
+
+  const reminderTime = typeof time === 'string' ? new Date(time) : new Date(NaN);
+  if (
+    typeof title !== 'string' ||
+    title.trim().length === 0 ||
+    title.length > 100 ||
+    !['medication', 'hydration', 'appointment', 'checkup'].includes(type) ||
+    !['once', 'daily', 'weekly', 'monthly'].includes(repeat) ||
+    !Number.isFinite(reminderTime.getTime()) ||
+    reminderTime.getTime() <= Date.now() ||
+    reminderTime.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Reminder details are invalid',
+    );
+  }
+
+  if (!(await checkRateLimit(userId, 'scheduleReminders', 30, 60000))) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'Reminder limit reached; try again shortly',
+    );
+  }
 
   try {
-    // Validate input
-    if (!title || !type || !time) {
-      throw new functions.https.HttpsError(
-        'invalid-argument',
-        'Missing required fields: title, type, time'
-      );
-    }
-
     const remindersRef = db.collection('users').doc(userId).collection('reminders');
     
     const reminderData = {
       userId,
-      title,
-      type, // 'medication', 'hydration', 'appointment', 'checkup'
-      time: new Date(time),
-      repeat: repeat || 'once', // 'once', 'daily', 'weekly'
+      title: title.trim(),
+      type,
+      time: reminderTime,
+      repeat,
       active: true,
       completed: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -80,7 +97,39 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
   }
 
   const userId = context.auth.uid;
-  const { title, body, type, data: notificationData } = data;
+  const { title, body, type = 'general', data: notificationData = {} } =
+    data ?? {};
+
+  if (
+    typeof title !== 'string' ||
+    title.trim().length === 0 ||
+    title.length > 100 ||
+    typeof body !== 'string' ||
+    body.trim().length === 0 ||
+    body.length > 1000 ||
+    typeof type !== 'string' ||
+    type.trim().length === 0 ||
+    type.length > 40 ||
+    notificationData === null ||
+    typeof notificationData !== 'object' ||
+    Array.isArray(notificationData) ||
+    Object.keys(notificationData).length > 20 ||
+    Object.entries(notificationData).some(([key, value]) =>
+      key.length > 40 || typeof value !== 'string' || value.length > 500
+    )
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Notification details are invalid',
+    );
+  }
+
+  if (!(await checkRateLimit(userId, 'sendNotification', 30, 60000))) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'Notification limit reached; try again shortly',
+    );
+  }
 
   try {
     // Get user's FCM token
@@ -98,12 +147,12 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
     // Send notification via Firebase Cloud Messaging
     const message = {
       notification: {
-        title,
-        body
+        title: title.trim(),
+        body: body.trim()
       },
       data: {
-        type: type || 'general',
-        ...notificationData
+        ...notificationData,
+        type
       },
       token: fcmToken
     };
@@ -154,11 +203,16 @@ export const processNotificationQueue = functions.pubsub
 
       for (const doc of remindersSnapshot.docs) {
         const reminder = doc.data();
-        const userId = reminder.userId;
+        const userRef = doc.ref.parent.parent;
+        if (!userRef || userRef.parent.path !== 'users') {
+          console.error('Skipping reminder with invalid document path:', doc.ref.path);
+          continue;
+        }
+        const userId = userRef.id;
 
         try {
           // Send notification
-          await sendNotificationForReminder(userId, reminder);
+          await sendNotificationForReminder(userId, doc.id, reminder);
 
           // Update next notification time based on repeat setting
           const nextTime = calculateNextNotificationTime(reminder);
@@ -206,7 +260,11 @@ async function scheduleNotification(
 /**
  * Helper function to send notification for a reminder
  */
-async function sendNotificationForReminder(userId: string, reminder: any): Promise<void> {
+async function sendNotificationForReminder(
+  userId: string,
+  reminderId: string,
+  reminder: any
+): Promise<void> {
   // Get user's FCM token
   const userDoc = await db.collection('users').doc(userId).get();
   const fcmToken = userDoc.data()?.fcmToken;
@@ -224,7 +282,7 @@ async function sendNotificationForReminder(userId: string, reminder: any): Promi
     data: {
       type: 'reminder',
       reminderType: reminder.type,
-      reminderId: reminder.id
+      reminderId
     },
     token: fcmToken
   };
@@ -234,6 +292,7 @@ async function sendNotificationForReminder(userId: string, reminder: any): Promi
     console.log(`Notification sent for reminder to user: ${userId}`);
   } catch (error) {
     console.error('Error sending reminder notification:', error);
+    throw error;
   }
 }
 

@@ -30,11 +30,10 @@ The new `sicklecare_backend` folder contains:
    - Fast searches and aggregations
 
 4. **Cloud Functions** (`functions/`)
-   - User management (onCreate, onDelete, profile updates)
-   - Health data validation and analytics
-   - Notification/reminder scheduling
-   - Report generation
-   - Data backup automation
+   - Authenticated Sika proxy with App Check, bounded input, and per-user rate limits
+   - User-data cleanup when an Auth account is deleted
+   - Analytics and JSON/CSV exports for the Flutter tracker schema
+   - JSON health reports stored in each user's reports subcollection
 
 ## 📋 Prerequisites
 
@@ -114,18 +113,19 @@ firebase deploy --only firestore:indexes
 
 #### User Functions
 - `onUserCreate`: Initialize profile when user signs up
-- `onUserDelete`: Clean up user data when account is deleted
+- `onUserDelete`: Clean up user-owned Firestore and Storage data when account is deleted
 - `updateUserProfile`: Update user settings/profile
 
 #### Health Functions
-- `validateHealthEntry`: Validate daily health logs
+- `validateHealthEntry`: Validate and process `users/{uid}/tracker_entries/{entryId}`
 - `processHealthAnalytics`: Calculate health insights
-- `exportHealthData`: Export user data as JSON/CSV
+- `exportHealthData`: Export up to 1,000 tracker entries as JSON/CSV
 
 #### Notification Functions
 - `scheduleReminders`: Create medication/hydration reminders
 - `sendNotification`: Send push notifications to user
 - `processNotificationQueue`: Scheduled job to trigger reminders
+- Mobile reminders remain on-device; the Flutter app does not currently register FCM tokens.
 
 #### Analytics Functions
 - `aggregateDailyStats`: Daily automated aggregation
@@ -134,14 +134,32 @@ firebase deploy --only firestore:indexes
 - `getUserStats`: Get user statistics summary
 
 #### Report Functions
-- `generateHealthReport`: Create health reports (PDF/JSON)
-- `sendWeeklyReport`: Automated weekly report distribution
+- `generateHealthReport`: Create and store bounded JSON reports
+- `sendWeeklyReport`: Store weekly reports for users with notifications enabled; no email is sent
 
 #### Utility Functions
 - `cleanupTempFiles`: Remove old temporary files
-- `sendEmail`: Queue admin-authorized emails for sending
+- `sendEmail`: Admin-only, rate-limited queue; delivery requires a separately configured worker
 - `validateApiKey`: Validate API keys for integrations
 - `getSystemHealth`: Health check endpoint
+
+#### Sika assistant
+
+The Flutter app calls the `askSika` callable after the user opts in to online
+chat. The callable requires Firebase Authentication and App Check, accepts only
+bounded chat text/history, and does not receive tracker or profile data. Its
+Groq credential is a server-side Secret Manager secret:
+
+```bash
+cd sicklecare_backend
+firebase functions:secrets:set GROQ_API_KEY
+firebase deploy --only functions
+```
+
+Set the secret interactively in the authorized Firebase project. Never add the
+provider key to Flutter assets, source, or local Hive storage. Without the
+secret, the callable returns a configuration error and the app uses its local
+fallback. Register a Firebase App Check debug token for local debug builds.
 
 ## 💻 Local Development
 
@@ -206,16 +224,16 @@ Scheduled functions run automatically (no user action needed):
 
 Rules are automatically enforced:
 ```dart
-// Users can only write to their own health data
+// Users can only write to their own tracker entries
 // This is validated by firestore.rules before saving
 
-final healthRef = FirebaseFirestore.instance
+final entriesRef = FirebaseFirestore.instance
   .collection('users')
   .doc(userId)
-  .collection('health');
+  .collection('tracker_entries');
 
 // This succeeds only if rules allow it
-await healthRef.doc(date).set(healthData);
+await entriesRef.doc(entryId).set(trackerEntry);
 ```
 
 ## 🔒 Security
@@ -243,7 +261,8 @@ Run this only where Application Default Credentials are configured for an author
 /users/{userId}
   ├── profile
   ├── settings
-  ├── health/{date}
+  ├── tracker_entries/{entryId}
+  ├── processed_tracker_entries/{entryId}
   ├── tracker_entries/{entryId}
   ├── reminders/{reminderId}
   └── reports/{reportId}
@@ -269,6 +288,10 @@ Run this only where Application Default Credentials are configured for an author
 /backups/{backupId}
   └── backup metadata
 ```
+
+`tracker_entries` is the canonical Flutter health record path. Older
+`health/{date}` records are not automatically migrated. `backupUserData`
+currently records backup metadata only; it is not a recoverable data backup.
 
 ## 🚨 Troubleshooting
 

@@ -15,6 +15,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final _heroBody = TextEditingController();
   bool _loading = true;
   bool _saving = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -22,7 +23,18 @@ class _AdminScreenState extends State<AdminScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _heroTitle.dispose();
+    _heroBody.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
+    final loadErrorMessage = context.l10n.tr(
+      'Could not load admin content. Check your connection and permissions.',
+      'Impossible de charger le contenu administrateur. Vérifie ta connexion et tes autorisations.',
+    );
     try {
       final doc = await FirebaseFirestore.instance
           .collection('content')
@@ -31,23 +43,43 @@ class _AdminScreenState extends State<AdminScreen> {
       final d = doc.data() ?? {};
       _heroTitle.text = d['heroTitle'] ?? '';
       _heroBody.text = d['heroBody'] ?? '';
-    } catch (_) {}
-    if (mounted) setState(() => _loading = false);
+    } catch (error) {
+      debugPrint('Failed to load admin content: $error');
+      if (mounted) _loadError = loadErrorMessage;
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _save() async {
     final l = context.l10n;
     setState(() => _saving = true);
-    await FirestoreService.updateContent('home', {
-      'heroTitle': _heroTitle.text.trim(),
-      'heroBody': _heroBody.text.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l.contentUpdated)),
-    );
+    try {
+      await FirestoreService.updateContent('home', {
+        'heroTitle': _heroTitle.text.trim(),
+        'heroBody': _heroBody.text.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.contentUpdated)),
+        );
+      }
+    } catch (error) {
+      debugPrint('Failed to save admin content: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.tr(
+              'Content could not be saved. Check your admin access and try again.',
+              'Le contenu n’a pas pu être enregistré. Vérifie ton accès administrateur et réessaie.',
+            )),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -57,6 +89,29 @@ class _AdminScreenState extends State<AdminScreen> {
       appBar: AppBar(title: Text(l.adminTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_loadError!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _loading = true;
+                              _loadError = null;
+                            });
+                            _load();
+                          },
+                          child: Text(l.tr('Retry', 'Réessayer')),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
           : ListView(
               padding: const EdgeInsets.all(18),
               children: [
@@ -106,6 +161,15 @@ class _AdminScreenState extends State<AdminScreen> {
                             .limit(20)
                             .snapshots(),
                         builder: (_, snap) {
+                          if (snap.hasError) {
+                            debugPrint(
+                              'Failed to load support messages: ${snap.error}',
+                            );
+                            return Text(l.tr(
+                              'Support messages could not be loaded.',
+                              'Impossible de charger les messages d’assistance.',
+                            ));
+                          }
                           if (!snap.hasData) {
                             return const Padding(
                               padding: EdgeInsets.all(12),

@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { isValidTrackerEntry } from './tracker_validation';
 
 const db = admin.firestore();
 
@@ -13,29 +14,21 @@ const db = admin.firestore();
  * Validates health entry before it's saved to Firestore
  */
 export const validateHealthEntry = functions.firestore
-  .document('users/{userId}/health/{date}')
+  .document('users/{userId}/tracker_entries/{entryId}')
   .onCreate(async (snap, context) => {
-    const { userId, date } = context.params;
+    const { userId, entryId } = context.params;
     const data = snap.data();
 
     try {
-      // Validate data structure
-      if (!isValidHealthData(data)) {
-        throw new Error('Invalid health data structure');
+      if (!isValidTrackerEntry(data, entryId)) {
+        throw new Error('Invalid tracker entry');
       }
 
-      // Log the entry
-      console.log(`Health entry validated for user: ${userId} on ${date}`);
-
-      // Update user's health stats
-      await updateUserHealthStats(userId, data);
-
-      // Process analytics if needed
-      await processHealthAnalyticsForEntry(userId, date, data);
-
+      await updateUserHealthStats(userId, entryId, data);
+      await processHealthAnalyticsForEntry(userId, entryId, data);
       return null;
     } catch (error) {
-      console.error(`Error validating health entry for ${userId}:`, error);
+      console.error(`Error processing tracker entry for ${userId}:`, error);
       throw error;
     }
   });
@@ -52,7 +45,13 @@ export const processHealthAnalytics = functions.https.onCall(async (data, contex
   }
 
   const userId = context.auth.uid;
-  const { period = 'week' } = data;
+  const period = data?.period ?? 'week';
+  if (!['week', 'month', 'year'].includes(period)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Period must be week, month, or year',
+    );
+  }
 
   try {
     const analytics = await calculateHealthAnalytics(userId, period);
@@ -82,40 +81,58 @@ export const exportHealthData = functions.https.onCall(async (data, context) => 
   }
 
   const userId = context.auth.uid;
-  const { format = 'json', startDate, endDate } = data;
+  const format = data?.format ?? 'json';
+  const { startDate, endDate } = data ?? {};
+  if (format !== 'json' && format !== 'csv') {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Format must be json or csv',
+    );
+  }
+  if ((startDate === undefined) !== (endDate === undefined)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Both startDate and endDate must be provided together',
+    );
+  }
+
+  const start = startDate === undefined ? undefined : new Date(startDate);
+  const end = endDate === undefined ? undefined : new Date(endDate);
+  if (
+    start !== undefined &&
+    end !== undefined &&
+    (!Number.isFinite(start.getTime()) ||
+      !Number.isFinite(end.getTime()) ||
+      start > end)
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Date range is invalid',
+    );
+  }
 
   try {
-    // Fetch health data
-    const healthRef = db.collection('users').doc(userId).collection('health');
-    let query: FirebaseFirestore.Query = healthRef;
+    const entriesRef = db.collection('users').doc(userId)
+      .collection('tracker_entries');
+    let query: FirebaseFirestore.Query = entriesRef;
 
-    if (startDate && endDate) {
+    if (start !== undefined && end !== undefined) {
       query = query
-        .where('timestamp', '>=', new Date(startDate))
-        .where('timestamp', '<=', new Date(endDate));
+        .where('date', '>=', start.toISOString())
+        .where('date', '<=', end.toISOString());
     }
 
-    const snapshot = await query.get();
-    const healthData = snapshot.docs.map(doc => ({
+    const snapshot = await query.orderBy('date', 'desc').limit(1000).get();
+    const healthData = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
     }));
 
-    // Format data based on format parameter
-    let exportedData: any;
-
-    if (format === 'csv') {
-      exportedData = convertToCSV(healthData);
-    } else {
-      exportedData = healthData;
-    }
-
-    console.log(`Health data exported for user: ${userId}`);
-
     return {
       success: true,
-      data: exportedData,
-      count: healthData.length
+      data: format === 'csv' ? convertToCSV(healthData) : healthData,
+      count: healthData.length,
+      truncated: snapshot.size === 1000
     };
   } catch (error) {
     console.error('Error exporting health data:', error);
@@ -127,72 +144,73 @@ export const exportHealthData = functions.https.onCall(async (data, context) => 
 });
 
 /**
- * Helper function to validate health data structure
+ * Helper function to validate the Flutter tracker entry schema.
  */
-function isValidHealthData(data: any): boolean {
-  const requiredFields = ['userId', 'painLevel', 'hydration', 'timestamp'];
-  
-  for (const field of requiredFields) {
-    if (!(field in data)) {
-      return false;
-    }
-  }
-
-  // Validate data types and ranges
-  if (typeof data.painLevel !== 'number' || data.painLevel < 0 || data.painLevel > 10) {
-    return false;
-  }
-
-  if (typeof data.hydration !== 'number' || data.hydration < 0 || data.hydration > 10) {
-    return false;
-  }
-
-  if (!(data.timestamp instanceof admin.firestore.Timestamp)) {
-    return false;
-  }
-
-  return true;
-}
-
 /**
- * Update user's aggregated health statistics
+ * Update user statistics once even if the Firestore trigger is retried.
  */
-async function updateUserHealthStats(userId: string, data: any): Promise<void> {
+async function updateUserHealthStats(
+  userId: string,
+  entryId: string,
+  data: FirebaseFirestore.DocumentData,
+): Promise<void> {
   try {
     const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
+    const processedRef = userRef.collection('processed_tracker_entries')
+      .doc(entryId);
+    const entryDate = new Date(data.date);
 
-    if (!userDoc.exists) {
-      return;
-    }
+    await db.runTransaction(async (transaction) => {
+      const processed = await transaction.get(processedRef);
+      if (processed.exists) return;
 
-    const stats = userDoc.data()?.healthStats || {};
-    
-    // Update stats
-    const updatedStats = {
-      totalEntries: (stats.totalEntries || 0) + 1,
-      lastEntryDate: new Date(),
-      averagePainLevel: calculateNewAverage(
-        stats.averagePainLevel || 0,
-        stats.totalEntries || 0,
-        data.painLevel
-      ),
-      averageHydration: calculateNewAverage(
-        stats.averageHydration || 0,
-        stats.totalEntries || 0,
-        data.hydration
-      ),
-      streakDays: calculateStreak(stats)
-    };
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) return;
 
-    await userRef.update({
-      healthStats: updatedStats,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      const stats = userDoc.data()?.healthStats ?? {};
+      const totalEntries = Number.isInteger(stats.totalEntries)
+        ? stats.totalEntries
+        : 0;
+      const trackerEntryCount = Number.isInteger(stats.trackerEntryCount)
+        ? stats.trackerEntryCount
+        : 0;
+      const previousDate = stats.lastEntryDate instanceof admin.firestore.Timestamp
+        ? stats.lastEntryDate.toDate()
+        : null;
+      const isLatest = previousDate === null || entryDate > previousDate;
+      const streakDays = isLatest
+        ? calculateStreak(previousDate, entryDate, stats.streakDays || 0)
+        : (stats.streakDays || 0);
+
+      transaction.update(userRef, {
+        healthStats: {
+          ...stats,
+          totalEntries: totalEntries + 1,
+          trackerEntryCount: trackerEntryCount + 1,
+          lastEntryDate: isLatest
+            ? admin.firestore.Timestamp.fromDate(entryDate)
+            : stats.lastEntryDate,
+          trackerAveragePainLevel: calculateNewAverage(
+            stats.trackerAveragePainLevel || 0,
+            trackerEntryCount,
+            data.painLevel,
+          ),
+          averageHydrationMl: calculateNewAverage(
+            stats.averageHydrationMl || 0,
+            trackerEntryCount,
+            data.hydrationMl,
+          ),
+          streakDays,
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.create(processedRef, {
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
-
-    console.log(`Health stats updated for user: ${userId}`);
   } catch (error) {
     console.error('Error updating health stats:', error);
+    throw error;
   }
 }
 
@@ -201,24 +219,34 @@ async function updateUserHealthStats(userId: string, data: any): Promise<void> {
  */
 async function processHealthAnalyticsForEntry(
   userId: string,
-  date: string,
-  data: any
+  entryId: string,
+  data: FirebaseFirestore.DocumentData
 ): Promise<void> {
   try {
-    // Store in analytics collection for trend analysis
     const analyticsRef = db.collection('analytics').doc(userId);
-    
-    await analyticsRef.set({
-      userId,
-      latestPainLevel: data.painLevel,
-      latestHydration: data.hydration,
-      latestTimestamp: data.timestamp,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const entryDate = new Date(data.date);
+    await db.runTransaction(async (transaction) => {
+      const analytics = await transaction.get(analyticsRef);
+      const previousDate = analytics.data()?.latestEntryDate;
+      const previousMillis = typeof previousDate === 'string'
+        ? Date.parse(previousDate)
+        : NaN;
+      if (Number.isFinite(previousMillis) && previousMillis > entryDate.getTime()) {
+        return;
+      }
 
-    console.log(`Analytics processed for user: ${userId}`);
+      transaction.set(analyticsRef, {
+        userId,
+        latestEntryId: entryId,
+        latestEntryDate: data.date,
+        latestPainLevel: data.painLevel,
+        latestHydrationMl: data.hydrationMl,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
   } catch (error) {
     console.error('Error processing analytics:', error);
+    throw error;
   }
 }
 
@@ -229,29 +257,27 @@ async function calculateHealthAnalytics(
   userId: string,
   period: string
 ): Promise<any> {
-  const healthRef = db.collection('users').doc(userId).collection('health');
-  
-  // Calculate date range
+  const entriesRef = db.collection('users').doc(userId)
+    .collection('tracker_entries');
   const now = new Date();
   let startDate = new Date();
 
   switch (period) {
     case 'week':
-      startDate.setDate(now.getDate() - 7);
+      startDate.setUTCDate(now.getUTCDate() - 7);
       break;
     case 'month':
-      startDate.setMonth(now.getMonth() - 1);
+      startDate.setUTCMonth(now.getUTCMonth() - 1);
       break;
     case 'year':
-      startDate.setFullYear(now.getFullYear() - 1);
+      startDate.setUTCFullYear(now.getUTCFullYear() - 1);
       break;
-    default:
-      startDate.setDate(now.getDate() - 7);
   }
 
-  const snapshot = await healthRef
-    .where('timestamp', '>=', startDate)
-    .where('timestamp', '<=', now)
+  const snapshot = await entriesRef
+    .where('date', '>=', startDate.toISOString())
+    .where('date', '<=', now.toISOString())
+    .orderBy('date', 'asc')
     .get();
 
   if (snapshot.empty) {
@@ -259,7 +285,7 @@ async function calculateHealthAnalytics(
       period,
       dataPoints: 0,
       averagePainLevel: 0,
-      averageHydration: 0,
+      averageHydrationMl: 0,
       maxPainLevel: 0,
       minPainLevel: 0,
       trend: 'stable'
@@ -270,7 +296,7 @@ async function calculateHealthAnalytics(
 
   // Calculate statistics
   const painLevels = entries.map(e => e.painLevel);
-  const hydrationLevels = entries.map(e => e.hydration);
+  const hydrationLevels = entries.map(e => e.hydrationMl);
 
   const averagePainLevel = painLevels.reduce((a, b) => a + b, 0) / painLevels.length;
   const averageHydration = hydrationLevels.reduce((a, b) => a + b, 0) / hydrationLevels.length;
@@ -279,7 +305,7 @@ async function calculateHealthAnalytics(
     period,
     dataPoints: entries.length,
     averagePainLevel: Math.round(averagePainLevel * 10) / 10,
-    averageHydration: Math.round(averageHydration * 10) / 10,
+    averageHydrationMl: Math.round(averageHydration),
     maxPainLevel: Math.max(...painLevels),
     minPainLevel: Math.min(...painLevels),
     medianPainLevel: getMedian(painLevels),
@@ -302,29 +328,32 @@ function calculateNewAverage(
 /**
  * Helper function to calculate streak
  */
-function calculateStreak(stats: any): number {
-  const lastEntryDate = stats.lastEntryDate;
-  
-  if (!lastEntryDate) {
+function calculateStreak(
+  previousDate: Date | null,
+  entryDate: Date,
+  currentStreak: number,
+): number {
+  if (previousDate === null) {
     return 1;
   }
 
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const previousDay = Date.UTC(
+    previousDate.getUTCFullYear(),
+    previousDate.getUTCMonth(),
+    previousDate.getUTCDate(),
+  );
+  const entryDay = Date.UTC(
+    entryDate.getUTCFullYear(),
+    entryDate.getUTCMonth(),
+    entryDate.getUTCDate(),
+  );
 
-  const lastDate = lastEntryDate instanceof admin.firestore.Timestamp 
-    ? lastEntryDate.toDate() 
-    : new Date(lastEntryDate);
-
-  // If last entry was today or yesterday, continue streak
-  if (lastDate.toDateString() === today.toDateString() || 
-      lastDate.toDateString() === yesterday.toDateString()) {
-    return (stats.streakDays || 0) + 1;
+  if (entryDay === previousDay) {
+    return currentStreak;
   }
 
-  // Otherwise, reset streak
-  return 1;
+  const dayMs = 24 * 60 * 60 * 1000;
+  return entryDay - previousDay === dayMs ? currentStreak + 1 : 1;
 }
 
 /**

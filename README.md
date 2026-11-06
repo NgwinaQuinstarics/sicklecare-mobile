@@ -1,161 +1,85 @@
-SickleCare Mobile App
-A production-ready Flutter mobile application designed to help patients manage Sickle Cell Disease (SCD) through daily health tracking, smart reminders, analytics, and support tools.
+# SickleCare
 
-🚀 Evolved from a demo app into a full health management ecosystem powered by Firebase
-📱 Features
-🔐 Authentication System
+SickleCare is a Flutter app for offline-first health tracking, reminders, and
+support for people affected by sickle cell disease. Firebase Authentication
+and Firestore are used for account and cloud features; health tracking and
+reminders continue to work locally.
 
-Secure signup & login using Firebase Auth
-Persistent user sessions
-Protected routes per user
-🏠 Smart Dashboard
+## Repository layout
 
-Daily health overview
-Quick access to all features
-Real-time health summary
+- `sicklecare_frontend/` — Flutter application and platform projects.
+- `sicklecare_backend/` — Firebase Functions, Firestore and Storage rules,
+  indexes, and backend setup.
+- `BACKEND_AUDIT_REPORT.md` — current findings, verification, and remaining
+  operational work.
+- `FRONTEND_BACKEND_INTEGRATION.md` — app/backend data and callable contracts.
 
-💧 Health Tracking
-Log daily hydration (liters)
-Track meals and nutrition
-Record pain levels (0–10 scale)
-Automatic timestamped entries
-Cloud sync via Firestore
+## Run the Flutter app
 
-📊 Analytics & History
-Visual charts using fl_chart
-Pain trends over time
-Hydration tracking insights
-Daily logs history with filtering
+Requirements: Flutter and Dart versions allowed by
+[`pubspec.yaml`](./sicklecare_frontend/pubspec.yaml), Android SDK, and Java 17.
 
-⏰ Smart Reminder System
-Medication, hydration, and meal reminders
-Local notifications (alarm-style)
-Mark reminders as completed
-Firebase-synced scheduling
-
-💬 Support Center
-In-app chat support system
-Basic AI auto-responses
-Emergency one-tap call feature
-FAQ system (admin-controlled content)
-🧭 Navigation & UX
-Global reusable drawer
-Clean and responsive UI
-Smooth screen transitions
-🧱 Tech Stack
-Flutter (Dart)
-Firebase
-Authentication
-Cloud Firestore
-Local Notifications
-fl_chart (Analytics visualization)
-Google Fonts
-Material Design UI
-📁 Project Structure
-
-lib/
-├── screens/
-│   ├── home_screen.dart
-│   ├── hydration_nutrition_screen.dart
-│   ├── tracker_screen.dart
-│   ├── reminders_screen.dart
-│   ├── history_screen.dart
-│   ├── support_screen.dart
-│
-├── widgets/
-│   ├── app_drawer.dart
-│
-├── services/
-│   ├── notification_service.dart
-│
-├── models/   (optional expansion)
-├── main.dart
-🔥 Firebase Database Structure
-
-users/{uid}/
-  ├── daily/{date}
-  │     ├── hydration
-  │     ├── painLevel
-  │     ├── meals[]
-  │     ├── updatedAt
-  │
-  ├── reminders/{reminderId}
-  │     ├── title
-  │     ├── hour
-  │     ├── minute
-  │     ├── completed
-  │
-  ├── support_messages/
-        ├── messages/
-⚙️ Getting Started
-1. Prerequisites
-Flutter SDK (>= 3.0)
-Dart (>= 3.0)
-Android Studio / VS Code
-Firebase project setup
-2. Installation
-Bash
-git clone https://github.com/NgwinaQuinstarics/sicklecare-mobile.git
-cd sicklecare-mobile
+```bash
+cd sicklecare_frontend
 flutter pub get
-3. Firebase Setup
-Create a Firebase project
-Add Android/iOS apps
-Download google-services.json (Android)
-Place it in:
-
-android/app/
-Enable:
-Authentication (Email/Password)
-Cloud Firestore
-Firebase rules (secured mode recommended)
-4. Run the App
-Bash
 flutter run
- Current Status
- Completed
-Authentication system
-Health tracking module
-Firebase integration
-Notifications system
-Analytics dashboard
-Support center UI
+```
 
- In Progress / Planned
-Admin dashboard (users & FAQs management)
-Advanced AI assistant (health insights)
-Cloud performance optimization
-Production deployment (Play Store release)
-🎯 Vision
+Firebase Android configuration (`android/app/google-services.json`) is local
+and ignored by Git. Configure the app with the approved Firebase project before
+testing cloud features. Do not commit Firebase service-account keys, local
+configuration, provider secrets, or signing keys.
 
+## Backend development
 
-SickleCare is designed to become a personal health companion for SCD patients, helping users:
-Prevent crises through daily monitoring
-Stay consistent with treatment
-Access emergency support instantly
-Understand long-term health patterns
+Cloud Functions, Firestore rules, Storage rules, and indexes are configured
+under `sicklecare_backend/`. That folder's `.firebaserc` default project matches
+the Flutter app's Firebase project configuration.
 
+```bash
+cd sicklecare_backend/functions
+npm ci
+npm run build
+npm run lint
+npm test -- --runInBand
+```
 
-🧠 Architecture Overview
-Frontend: Flutter UI (modular screens + reusable widgets)
-Backend: Firebase (Auth + Firestore)
-Notifications: Local scheduling system
-State Flow: Stateless + Firestore-driven updates
-📸 Screenshots (Add Later)
+The backend's `askSika` callable requires an authorized Secret Manager value for
+`GROQ_API_KEY`. Provision it interactively with the Firebase CLI from
+`sicklecare_backend/`; never place the key in Flutter or source control. The app
+uses its local fallback if the online callable is unavailable.
 
-/assets/screenshots/
-👨‍💻 Author
-Ngwina Quinstarics
-Flutter Developer
-Web & Mobile Systems Builder
+Deployments are **not** performed by these local build/test commands. Before
+deploying, review Firebase project selection, App Check configuration, billing,
+indexes, and security rules. Only trusted operators should grant custom Auth
+claims; a Firestore profile role is not authorization.
 
-📄 License
-This project is currently for educational and development purposes.
-A production license will be added in future releases.
+## Verification
 
-🚀 Future Upgrade Ideas
-AI-powered health predictions
-Doctor/patient chat system
-Wearable device integration
-Offline-first mode
-Multi-language support
+```bash
+cd sicklecare_frontend
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+The debug APK is written to
+`sicklecare_frontend/build/app/outputs/flutter-apk/app-debug.apk` and is
+ignored by Git. It is for testing, not Play Store distribution. Release
+distribution requires a separately managed Android signing key.
+
+## Current feature boundaries
+
+- Sika online chat is opt-in and sends bounded chat text/history to the
+  authenticated backend callable; tracker, profile, and reminder data are not
+  attached.
+- Tracker entries use
+  `users/{uid}/tracker_entries/{entryId}`. Older records under `health/` are
+  not automatically migrated.
+- Reminders are device-local. Cloud FCM delivery is not integrated in the
+  Flutter app.
+- The admin surface is an in-app Flutter screen for home content and support
+  messages; this repository does not contain a separate web admin console.
+- Weekly report generation stores JSON reports. Email delivery and recoverable
+  user backups require additional services and are not represented as working
+  features.

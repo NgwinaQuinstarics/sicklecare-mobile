@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'l10n/strings.dart';
 import 'signup.dart';
@@ -65,14 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     try {
       final email = _email.text.trim();
-      try {
-        await FirebaseFunctions.instance
-            .httpsCallable('requestPasswordReset')
-            .call({'email': email});
-      } catch (e) {
-        debugPrint('Custom reset email failed, falling back to Firebase: $e');
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      }
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

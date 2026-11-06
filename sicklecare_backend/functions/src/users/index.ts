@@ -55,11 +55,6 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 
     console.log(`User profile created for: ${user.uid}`);
     
-    // Send welcome email
-    if (user.email) {
-      await sendWelcomeEmail(user.email, user.displayName);
-    }
-    
     return null;
   } catch (error) {
     console.error('Error creating user profile:', error);
@@ -69,25 +64,41 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 
 /**
  * Triggered when a user is deleted from Firebase Auth
- * Cleans up user data from Firestore
+ * Removes user-owned Firestore and Storage data after account deletion.
  */
 export const onUserDelete = functions.auth.user().onDelete(async (user) => {
   try {
     const userRef = db.collection('users').doc(user.uid);
-    
-    // Delete user document
+
+    await Promise.all([
+      deleteCollection(userRef.collection('health'), 100),
+      deleteCollection(userRef.collection('tracker_entries'), 100),
+      deleteCollection(userRef.collection('processed_tracker_entries'), 100),
+      deleteCollection(userRef.collection('reminders'), 100),
+      deleteCollection(userRef.collection('settings'), 100),
+      deleteCollection(userRef.collection('profile'), 100),
+      deleteCollection(
+        db.collection('notifications').doc(user.uid).collection('history'),
+        100,
+      ),
+      deleteQuery(
+        db.collection('support_messages').where('uid', '==', user.uid),
+        100,
+      ),
+      deleteQuery(
+        db.collection('reports').where('userId', '==', user.uid),
+        100,
+      ),
+      deleteQuery(
+        db.collection('backups').where('userId', '==', user.uid),
+        100,
+      ),
+      db.collection('analytics').doc(user.uid).delete(),
+      admin.storage().bucket().deleteFiles({ prefix: `users/${user.uid}/` }),
+    ]);
+
     await userRef.delete();
-    
-    // Delete user's health data (in batches)
-    const healthRef = userRef.collection('health');
-    await deleteCollection(healthRef, 100);
-    
-    // Delete user's reminders
-    const remindersRef = userRef.collection('reminders');
-    await deleteCollection(remindersRef, 100);
-    
     console.log(`User data cleaned up for: ${user.uid}`);
-    
     return null;
   } catch (error) {
     console.error('Error deleting user data:', error);
@@ -154,70 +165,23 @@ async function deleteCollection(
   collectionRef: FirebaseFirestore.CollectionReference,
   batchSize: number
 ): Promise<void> {
-  const query = collectionRef.orderBy('__name__').limit(batchSize);
-
-  return new Promise((resolve, reject) => {
-    deleteQueryBatch(query, batchSize, resolve, reject);
-  });
+  await deleteQuery(collectionRef.orderBy('__name__'), batchSize);
 }
 
-async function deleteQueryBatch(
+async function deleteQuery(
   query: FirebaseFirestore.Query,
-  batchSize: number,
-  resolve: () => void,
-  reject: (error: any) => void
+  batchSize: number
 ): Promise<void> {
-  try {
-    const snapshot = await query.get();
-
-    if (snapshot.size === 0) {
-      resolve();
-      return;
-    }
-
+  let snapshot = await query.limit(batchSize).get();
+  while (!snapshot.empty) {
     const batch = db.batch();
     snapshot.docs.forEach((doc) => {
       batch.delete(doc.ref);
     });
-
     await batch.commit();
-
-    // Recurse on the next process tick to avoid
-    // exploding the stack.
-    process.nextTick(() => {
-      deleteQueryBatch(query, batchSize, resolve, reject);
-    });
-  } catch (error) {
-    reject(error);
+    if (snapshot.size < batchSize) return;
+    snapshot = await query.limit(batchSize).get();
   }
-}
-
-/**
- * Send welcome email to new users
- */
-async function sendWelcomeEmail(email: string, name: string | null | undefined): Promise<void> {
-  if (!email) return;
-
-  // In a real implementation, use an email service like SendGrid
-  // For now, we'll just log it
-  console.log(`Welcome email would be sent to: ${email}`);
-  console.log(`Welcome ${name || 'User'} to SickleCare!`);
-  
-  // Example with SendGrid (commented out):
-  /*
-  const sgMail = require('@sendgrid/mail');
-  sgMail.setApiKey(functions.config().sendgrid.key);
-  
-  const msg = {
-    to: email,
-    from: 'welcome@sicklecare.com',
-    subject: 'Welcome to SickleCare!',
-    text: `Hello ${name || 'User'},\n\nWelcome to SickleCare! We're excited to help you manage your health.`,
-    html: `<strong>Welcome to SickleCare!</strong><p>Hello ${name || 'User'},</p><p>We're excited to help you manage your health.</p>`,
-  };
-  
-  await sgMail.send(msg);
-  */
 }
 
 /**

@@ -1,23 +1,44 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/privacy_data_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? get user => FirebaseAuth.instance.currentUser;
   Map<String, dynamic>? _profile;
+  StreamSubscription<User?>? _authSubscription;
+  bool _isAdmin = false;
+
   Map<String, dynamic>? get profile => _profile;
 
-  bool get isAdmin => (_profile?['role'] ?? 'user') == 'admin';
+  bool get isAdmin => _isAdmin;
 
   AuthProvider() {
-    FirebaseAuth.instance.authStateChanges().listen((u) async {
-      if (u != null) {
-        await loadProfile();
-      } else {
-        _profile = null;
-      }
+    _authSubscription = FirebaseAuth.instance.idTokenChanges().listen(
+      _handleAuthChange,
+    );
+  }
+
+  Future<void> _handleAuthChange(User? u) async {
+    if (u == null) {
+      _isAdmin = false;
+      _profile = null;
       notifyListeners();
-    });
+      return;
+    }
+
+    try {
+      final token = await u.getIdTokenResult();
+      _isAdmin = token.claims?['admin'] == true;
+    } catch (error) {
+      debugPrint('Failed to read Firebase admin claim: $error');
+      _isAdmin = false;
+    }
+
+    if (FirebaseAuth.instance.currentUser?.uid != u.uid) return;
+    await loadProfile();
   }
 
   Future<void> loadProfile() async {
@@ -46,7 +67,9 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       notifyListeners();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Failed to load user profile: $error');
+    }
   }
 
   Future<void> updateProfile(Map<String, dynamic> data) async {
@@ -68,14 +91,20 @@ class AuthProvider extends ChangeNotifier {
   Future<void> deleteAccount() async {
     final u = FirebaseAuth.instance.currentUser;
     if (u == null) return;
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(u.uid)
-          .delete();
-    } catch (_) {}
     await u.delete();
     _profile = null;
+    _isAdmin = false;
+    try {
+      await PrivacyDataService.deleteLocalHealthData();
+    } catch (error) {
+      debugPrint('Account deleted, but local data cleanup failed: $error');
+    }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

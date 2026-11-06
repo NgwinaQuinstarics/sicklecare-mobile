@@ -48,7 +48,13 @@ export const generateTrends = functions.https.onCall(async (data, context) => {
   }
 
   const userId = context.auth.uid;
-  const { days = 30 } = data;
+  const days = data?.days ?? 30;
+  if (!Number.isInteger(days) || days < 1 || days > 365) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Days must be an integer between 1 and 365',
+    );
+  }
 
   try {
     const trends = await calculateHealthTrends(userId, days);
@@ -97,18 +103,15 @@ export const backupUserData = functions.pubsub
  * Helper function to aggregate user daily stats
  */
 async function aggregateUserDailyStats(userId: string): Promise<void> {
-  const healthRef = db.collection('users').doc(userId).collection('health');
-  
-  // Get today's data
+  const entriesRef = db.collection('users').doc(userId).collection('tracker_entries');
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
+  today.setUTCHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-  const snapshot = await healthRef
-    .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(today))
-    .where('timestamp', '<', admin.firestore.Timestamp.fromDate(tomorrow))
+  const snapshot = await entriesRef
+    .where('date', '>=', today.toISOString())
+    .where('date', '<', tomorrow.toISOString())
     .get();
 
   if (snapshot.empty) {
@@ -119,7 +122,7 @@ async function aggregateUserDailyStats(userId: string): Promise<void> {
 
   // Calculate daily aggregates
   const painLevels = entries.map(e => e.painLevel);
-  const hydrationLevels = entries.map(e => e.hydration);
+  const hydrationLevels = entries.map(e => e.hydrationMl);
 
   const dailyStats = {
     date: today,
@@ -129,7 +132,7 @@ async function aggregateUserDailyStats(userId: string): Promise<void> {
       min: Math.min(...painLevels),
       max: Math.max(...painLevels)
     },
-    hydration: {
+    hydrationMl: {
       average: hydrationLevels.reduce((a, b) => a + b, 0) / hydrationLevels.length,
       min: Math.min(...hydrationLevels),
       max: Math.max(...hydrationLevels)
@@ -151,17 +154,17 @@ async function aggregateUserDailyStats(userId: string): Promise<void> {
  * Helper function to calculate health trends
  */
 async function calculateHealthTrends(userId: string, days: number): Promise<any> {
-  const healthRef = db.collection('users').doc(userId).collection('health');
+  const entriesRef = db.collection('users').doc(userId).collection('tracker_entries');
   
   // Calculate date range
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setDate(endDate.getDate() - days);
+  startDate.setUTCDate(endDate.getUTCDate() - days);
 
-  const snapshot = await healthRef
-    .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(startDate))
-    .where('timestamp', '<=', admin.firestore.Timestamp.fromDate(endDate))
-    .orderBy('timestamp', 'desc')
+  const snapshot = await entriesRef
+    .where('date', '>=', startDate.toISOString())
+    .where('date', '<=', endDate.toISOString())
+    .orderBy('date', 'desc')
     .get();
 
   if (snapshot.empty) {
@@ -177,7 +180,8 @@ async function calculateHealthTrends(userId: string, days: number): Promise<any>
 
   snapshot.docs.forEach(doc => {
     const data = doc.data();
-    const date = data.timestamp.toDate().toISOString().split('T')[0];
+    if (typeof data.date !== 'string') return;
+    const date = data.date.substring(0, 10);
 
     if (!groupedByDate[date]) {
       groupedByDate[date] = [];
@@ -188,22 +192,26 @@ async function calculateHealthTrends(userId: string, days: number): Promise<any>
   // Calculate daily trends
   const trends = Object.entries(groupedByDate).map(([date, entries]) => {
     const painLevels = entries.map(e => e.painLevel);
-    const hydrationLevels = entries.map(e => e.hydration);
+    const hydrationLevels = entries.map(e => e.hydrationMl);
 
     return {
       date,
       painLevel: Math.round(painLevels.reduce((a, b) => a + b, 0) / painLevels.length * 10) / 10,
-      hydration: Math.round(hydrationLevels.reduce((a, b) => a + b, 0) / hydrationLevels.length * 10) / 10,
+      hydrationMl: Math.round(hydrationLevels.reduce((a, b) => a + b, 0) / hydrationLevels.length),
       entries: entries.length
     };
   });
 
-  // Calculate overall trend direction
-  const firstThird = trends.slice(0, Math.floor(trends.length / 3));
-  const lastThird = trends.slice(-Math.floor(trends.length / 3));
+  trends.sort((a, b) => a.date.localeCompare(b.date));
 
-  const firstAvgPain = firstThird.reduce((a, b) => a + b.painLevel, 0) / firstThird.length;
-  const lastAvgPain = lastThird.reduce((a, b) => a + b.painLevel, 0) / lastThird.length;
+  // Calculate overall trend direction
+  const comparisonSize = Math.max(1, Math.floor(trends.length / 3));
+  const firstThird = trends.slice(0, comparisonSize);
+  const lastThird = trends.slice(-comparisonSize);
+  const firstAvgPain = firstThird.reduce((a, b) => a + b.painLevel, 0) /
+    firstThird.length;
+  const lastAvgPain = lastThird.reduce((a, b) => a + b.painLevel, 0) /
+    lastThird.length;
 
   const painTrend = lastAvgPain < firstAvgPain ? 'improving' : 
                     lastAvgPain > firstAvgPain ? 'worsening' : 'stable';
@@ -212,7 +220,7 @@ async function calculateHealthTrends(userId: string, days: number): Promise<any>
     period: days,
     dataPoints: snapshot.size,
     painTrend,
-    trends: trends.reverse() // Show chronologically
+    trends
   };
 }
 
@@ -223,7 +231,8 @@ async function createUserBackup(userId: string): Promise<void> {
   try {
     // Get all user data
     const userDoc = await db.collection('users').doc(userId).get();
-    const healthSnapshot = await db.collection('users').doc(userId).collection('health').get();
+    const entriesSnapshot = await db.collection('users').doc(userId)
+      .collection('tracker_entries').get();
     const remindersSnapshot = await db.collection('users').doc(userId).collection('reminders').get();
 
     // Create backup document
@@ -232,11 +241,11 @@ async function createUserBackup(userId: string): Promise<void> {
       backupDate: admin.firestore.FieldValue.serverTimestamp(),
       dataSize: JSON.stringify({
         user: userDoc.data(),
-        health: healthSnapshot.docs.map(d => d.data()),
+        trackerEntries: entriesSnapshot.docs.map(d => d.data()),
         reminders: remindersSnapshot.docs.map(d => d.data())
       }).length,
       recordCount: {
-        health: healthSnapshot.size,
+        trackerEntries: entriesSnapshot.size,
         reminders: remindersSnapshot.size
       }
     };
@@ -265,11 +274,12 @@ export const getUserStats = functions.https.onCall(async (data, context) => {
 
   try {
     const userDoc = await db.collection('users').doc(userId).get();
-    const healthSnapshot = await db.collection('users').doc(userId).collection('health').get();
+    const entriesSnapshot = await db.collection('users').doc(userId)
+      .collection('tracker_entries').get();
     const remindersSnapshot = await db.collection('users').doc(userId).collection('reminders').get();
 
     const stats = {
-      totalHealthEntries: healthSnapshot.size,
+      totalHealthEntries: entriesSnapshot.size,
       totalReminders: remindersSnapshot.size,
       activeReminders: remindersSnapshot.docs.filter(d => d.data().active).length,
       healthStats: userDoc.data()?.healthStats || {},

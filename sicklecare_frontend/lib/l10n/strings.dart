@@ -326,8 +326,8 @@ class L10n {
   String get about => tr('About', 'À propos');
   String get aboutSikaTitle => tr('About Sika', 'À propos de Sika');
   String get aboutSikaBody => tr(
-      'Sika is your SickleCare assistant, tailored to the Cameroonian context. It offers general guidance on hydration, nutrition, pain and daily care. Sika is NOT a doctor and does not replace professional medical advice — in an emergency, go to the nearest hospital.',
-      "Sika est ton assistant SickleCare, adapté au contexte camerounais. Il donne des conseils généraux sur l'hydratation, la nutrition, la douleur et les soins quotidiens. Sika n'est PAS un médecin et ne remplace pas un avis médical professionnel — en cas d'urgence, va à l'hôpital le plus proche.");
+      'Sika offers general health education and is not a doctor. Online questions and recent chat messages are sent to our AI service. Tracker, profile and reminder data are not attached automatically. Avoid sharing identifying information. For urgent symptoms, go to the nearest hospital.',
+      "Sika fournit des informations générales et ne remplace pas un médecin. Les questions et messages récents sont envoyés à notre service d'IA lorsque tu es en ligne. Les check-ins, le profil et les rappels ne sont pas joints automatiquement. Évite de partager des informations qui t'identifient. En cas d'urgence, va à l'hôpital le plus proche.");
   String get chatCleared => tr('Chat cleared', 'Chat effacé');
   String get historyCleared => tr('History cleared', 'Historique effacé');
   List<String> get aiSuggestions => fr
