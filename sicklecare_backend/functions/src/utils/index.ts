@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { createHash } from 'crypto';
 
 const db = admin.firestore();
 const storage = admin.storage();
@@ -45,31 +46,45 @@ export const cleanupTempFiles = functions.pubsub
  * Send email function
  */
 export const sendEmail = functions.https.onCall(async (data, context) => {
-  // This can be restricted to admin or system functions only
-  const { to, subject, body, html, fromAdmin = false } = data;
-
-  if (fromAdmin && (!context.auth || !context.auth.token.admin)) {
+  if (!context.auth || context.auth.token.admin !== true) {
     throw new functions.https.HttpsError(
       'permission-denied',
       'Only admins can send emails'
     );
   }
 
-  try {
-    // Validate email
-    if (!isValidEmail(to)) {
-      throw new functions.https.HttpsError(
-        'invalid-argument',
-        'Invalid email address'
-      );
-    }
+  const { to, subject, body, html } = data ?? {};
+  if (
+    typeof to !== 'string' ||
+    !isValidEmail(to) ||
+    typeof subject !== 'string' ||
+    subject.trim().length === 0 ||
+    subject.length > 200 ||
+    typeof body !== 'string' ||
+    body.trim().length === 0 ||
+    body.length > 10000 ||
+    (html !== undefined &&
+      (typeof html !== 'string' || html.length > 20000))
+  ) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'A valid recipient, subject, and message are required'
+    );
+  }
 
-    // Store email for later sending (in production, use SendGrid/Mailgun)
+  if (!(await checkRateLimit(context.auth.uid, 'sendEmail', 10, 60000))) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'Email sending limit reached; try again later'
+    );
+  }
+
+  try {
     await db.collection('emails').add({
-      to,
-      subject,
-      body,
-      html,
+      to: to.trim(),
+      subject: subject.trim(),
+      body: body.trim(),
+      ...(html === undefined ? {} : { html }),
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -204,31 +219,54 @@ export async function checkRateLimit(
   limit: number = 10,
   windowMs: number = 60000
 ): Promise<boolean> {
+  if (
+    userId.trim().length === 0 ||
+    action.trim().length === 0 ||
+    !Number.isInteger(limit) ||
+    limit <= 0 ||
+    !Number.isInteger(windowMs) ||
+    windowMs <= 0
+  ) {
+    throw new RangeError('Rate limit parameters must be valid positive values');
+  }
+
+  const now = Date.now();
+  const windowStart = Math.floor(now / windowMs) * windowMs;
+  const bucketId = createHash('sha256')
+    .update(`${userId}\0${action}`)
+    .digest('hex');
+  const bucketRef = db.collection('rate_limits').doc(bucketId);
+
   try {
-    const now = Date.now();
-    const windowStart = now - windowMs;
+    return await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(bucketRef);
+      let count = 0;
 
-    const query = await db.collection('rate_limits')
-      .where('userId', '==', userId)
-      .where('action', '==', action)
-      .where('timestamp', '>', new Date(windowStart))
-      .get();
+      if (snapshot.exists && snapshot.get('windowStart') === windowStart) {
+        count = snapshot.get('count');
+        if (!Number.isInteger(count) || count < 0) {
+          throw new Error('Invalid rate limit counter');
+        }
+      }
 
-    if (query.size >= limit) {
-      return false;
-    }
+      if (count >= limit) {
+        return false;
+      }
 
-    // Record this action
-    await db.collection('rate_limits').add({
-      userId,
-      action,
-      timestamp: new Date()
+      transaction.set(bucketRef, {
+        windowStart,
+        count: count + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return true;
     });
-
-    return true;
   } catch (error) {
     console.error('Error checking rate limit:', error);
-    return true; // Allow on error
+    throw new functions.https.HttpsError(
+      'unavailable',
+      'Unable to verify the request limit'
+    );
   }
 }
 

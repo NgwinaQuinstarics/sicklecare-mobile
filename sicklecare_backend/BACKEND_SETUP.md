@@ -5,7 +5,7 @@ This is the Firebase-based backend for the SickleCare health management applicat
 
 ## ✅ What's Already Done
 
-Your Flutter app (`sicklecare_app`) already has:
+Your Flutter app (`sicklecare_frontend`) already has:
 - ✅ Firebase Authentication
 - ✅ Cloud Firestore database
 - ✅ Basic data structure
@@ -16,9 +16,9 @@ Your Flutter app (`sicklecare_app`) already has:
 The new `sicklecare_backend` folder contains:
 
 1. **Enhanced Security Rules** (`firestore.rules`)
-   - Role-based access control (Patient, Doctor, Admin, Caregiver)
-   - Data validation at database level
-   - Rate limiting rules
+   - Owner-scoped health data and validated writes
+   - Admin/support access based on trusted Firebase custom claims
+   - Profile fields cannot grant or change privileged roles
 
 2. **Storage Security** (`storage.rules`)
    - Secure file upload/download
@@ -62,7 +62,6 @@ sicklecare_backend/
 │   │   └── utils/           # Utility functions
 │   ├── package.json         # Functions dependencies
 │   └── tsconfig.json        # TypeScript config
-└── README.md                # Full documentation
 ```
 
 ## 🔧 Setup Instructions
@@ -140,7 +139,7 @@ firebase deploy --only firestore:indexes
 
 #### Utility Functions
 - `cleanupTempFiles`: Remove old temporary files
-- `sendEmail`: Queue emails for sending
+- `sendEmail`: Queue admin-authorized emails for sending
 - `validateApiKey`: Validate API keys for integrations
 - `getSystemHealth`: Health check endpoint
 
@@ -154,6 +153,13 @@ npm run serve
 ```
 
 This starts the Firebase emulator at http://localhost:5001
+
+To run Auth, Firestore, and Storage locally while checking authorization rules:
+
+```bash
+cd ..
+firebase emulators:start --project demo-sicklecare --only auth,firestore,storage
+```
 
 ### Watch Mode (Auto-rebuild)
 
@@ -216,22 +222,20 @@ await healthRef.doc(date).set(healthData);
 
 ### Built-in Protections
 1. **Authentication**: User must be logged in
-2. **Authorization**: Users can only access their own data (with exceptions for admins/doctors)
-3. **Validation**: All data is validated before saving
-4. **Rate Limiting**: Prevents abuse by limiting requests
-5. **Audit Logging**: Tracks sensitive operations
+2. **Authorization**: Users can access their own health data; admin/support access requires trusted custom claims
+3. **Validation**: Profile, tracker, support, and health writes are bounded by Firestore rules
+4. **Storage**: Uploads are owner-scoped, type/size limited, and do not have a broad user-path write rule
+5. **Email**: The callable email queue is admin-only and validates bounded message fields
+6. **Rate limiting**: The exported helper uses an atomic fixed-window counter and fails closed, but callers must invoke it explicitly
 
 ### Admin Setup
 
-To create an admin user:
+From `sicklecare_backend/functions`, set administrator claims only in a trusted environment using the Firebase Admin SDK. Never let a client set custom claims or treat a profile document's `role` field as authorization:
 ```bash
-firebase auth:set-custom-claims <uid> --claims '{"admin":true}'
+node -e "const admin=require('firebase-admin'); admin.initializeApp(); (async()=>{const uid=process.argv[1]; const user=await admin.auth().getUser(uid); await admin.auth().setCustomUserClaims(uid,{...(user.customClaims||{}),admin:true})})().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})" USER_UID
 ```
 
-To create a doctor user:
-```bash
-firebase auth:set-custom-claims <uid> --claims '{"doctor":true}'
-```
+Run this only where Application Default Credentials are configured for an authorized operator. Ask the user to refresh their ID token after changing claims.
 
 ## 📊 Firestore Collections
 
@@ -240,6 +244,7 @@ firebase auth:set-custom-claims <uid> --claims '{"doctor":true}'
   ├── profile
   ├── settings
   ├── health/{date}
+  ├── tracker_entries/{entryId}
   ├── reminders/{reminderId}
   └── reports/{reportId}
 
@@ -251,6 +256,12 @@ firebase auth:set-custom-claims <uid> --claims '{"doctor":true}'
 
 /support/{ticketId}
   └── support tickets
+
+/support_messages/{messageId}
+  └── Admin dashboard support inbox
+
+/content/{contentId}
+  └── Public app content; admin writes only
 
 /audit_logs/{logId}
   └── operation logs
