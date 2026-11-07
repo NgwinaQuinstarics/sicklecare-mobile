@@ -358,7 +358,7 @@ export function OverviewView({ onNavigate }: OverviewViewProps) {
           <span>Jump straight into your daily work.</span>
         </div>
         <button className="quick-action" onClick={() => onNavigate('inbox')}>
-          <span className="quick-action-icon quick-purple"><Inbox size={18} /></span>
+          <span className="quick-action-icon quick-coral"><Inbox size={18} /></span>
           <span><strong>Review support</strong><small>Manage incoming requests</small></span>
           <ArrowUpRight size={16} />
         </button>

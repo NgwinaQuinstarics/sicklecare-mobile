@@ -155,8 +155,10 @@ export function App() {
           <p className="eyebrow">SICKLECARE ADMIN</p>
           <h1>Administrator access required</h1>
           <p>
-            This account is signed in, but it does not have the trusted
-            administrator permission required for this console.
+            Your password was accepted, but this account has not been granted
+            the trusted administrator permission. Ask your Firebase project
+            operator to assign the boolean <code>admin: true</code> custom
+            claim to this account&apos;s UID, then sign out and back in.
           </p>
           {accessError && <p className="inline-error">{accessError}</p>}
           <button className="button button-secondary button-wide" onClick={refreshAccess}>

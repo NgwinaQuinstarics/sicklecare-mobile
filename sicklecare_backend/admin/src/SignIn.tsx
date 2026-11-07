@@ -22,6 +22,10 @@ function authErrorMessage(code: string): string {
       return 'Could not reach the sign-in service. Check your connection.';
     case 'auth/invalid-email':
       return 'Enter a valid email address.';
+    case 'auth/operation-not-allowed':
+      return 'Email/password sign-in is disabled. Ask your Firebase project operator to enable it.';
+    case 'auth/user-disabled':
+      return 'This account is disabled. Ask your Firebase project operator for help.';
     default:
       return 'Sign-in could not be completed. Please try again.';
   }
@@ -108,7 +112,9 @@ export function SignIn({ accessError }: SignInProps) {
           <span className="eyebrow">WELCOME BACK</span>
           <h2>Sign in to your workspace</h2>
           <p className="signin-intro">
-            Use your authorized administrator account to continue.
+            Use an account created in Firebase Authentication. An authorized
+            Firebase operator must grant it admin access; there is no default
+            or shared administrator password.
           </p>
 
           <form onSubmit={submit} className="signin-form">
