@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 import { isValidTrackerEntry } from './tracker_validation';
 
@@ -174,7 +175,7 @@ async function updateUserHealthStats(
       const trackerEntryCount = Number.isInteger(stats.trackerEntryCount)
         ? stats.trackerEntryCount
         : 0;
-      const previousDate = stats.lastEntryDate instanceof admin.firestore.Timestamp
+      const previousDate = stats.lastEntryDate instanceof Timestamp
         ? stats.lastEntryDate.toDate()
         : null;
       const isLatest = previousDate === null || entryDate > previousDate;
@@ -188,7 +189,7 @@ async function updateUserHealthStats(
           totalEntries: totalEntries + 1,
           trackerEntryCount: trackerEntryCount + 1,
           lastEntryDate: isLatest
-            ? admin.firestore.Timestamp.fromDate(entryDate)
+            ? Timestamp.fromDate(entryDate)
             : stats.lastEntryDate,
           trackerAveragePainLevel: calculateNewAverage(
             stats.trackerAveragePainLevel || 0,
@@ -202,10 +203,10 @@ async function updateUserHealthStats(
           ),
           streakDays,
         },
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       transaction.create(processedRef, {
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedAt: FieldValue.serverTimestamp(),
       });
     });
   } catch (error) {
@@ -241,7 +242,7 @@ async function processHealthAnalyticsForEntry(
         latestEntryDate: data.date,
         latestPainLevel: data.painLevel,
         latestHydrationMl: data.hydrationMl,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
     });
   } catch (error) {

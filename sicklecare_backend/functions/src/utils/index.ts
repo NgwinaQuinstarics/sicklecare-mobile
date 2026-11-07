@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'crypto';
 
 const db = admin.firestore();
@@ -86,7 +87,7 @@ export const sendEmail = functions.https.onCall(async (data, context) => {
       body: body.trim(),
       ...(html === undefined ? {} : { html }),
       status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
 
     console.log(`Email queued to: ${to}`);
@@ -139,7 +140,7 @@ export const validateApiKey = functions.https.onCall(async (data, context) => {
 
     // Update last used timestamp
     await keyDoc.ref.update({
-      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUsedAt: FieldValue.serverTimestamp(),
       usageCount: (keyData?.usageCount || 0) + 1
     });
 
@@ -202,7 +203,7 @@ export async function logAuditTrail(
       action,
       details,
       status,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       ipAddress: details.ipAddress || 'unknown'
     });
   } catch (error) {
@@ -256,7 +257,7 @@ export async function checkRateLimit(
       transaction.set(bucketRef, {
         windowStart,
         count: count + 1,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp()
       });
 
       return true;

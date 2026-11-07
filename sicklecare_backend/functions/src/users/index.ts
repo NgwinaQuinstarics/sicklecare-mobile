@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 
 const db = admin.firestore();
@@ -24,8 +25,8 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
       displayName: user.displayName || '',
       photoURL: user.photoURL || '',
       role: 'patient', // Default role
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       settings: {
         notifications: {
           enabled: true,
@@ -126,7 +127,7 @@ export const updateUserProfile = functions.https.onCall(async (data, context) =>
     const userRef = db.collection('users').doc(userId);
     
     const updateData: any = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     };
 
     if (displayName !== undefined) {

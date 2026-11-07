@@ -175,7 +175,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId);
       allow create: if isOwner(userId) && validUserCreate(userId);
       allow update: if isOwner(userId) && validUserUpdate();
       allow delete: if isAdmin();
@@ -260,12 +260,14 @@ service cloud.firestore {
 
     match /support_messages/{messageId} {
       allow create: if isSignedIn() && validSupportMessage();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /contacts/{contactId} {
       allow create: if validContactPayload();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /analytics/{userId} {
@@ -299,7 +301,7 @@ service cloud.firestore {
 
     match /content/{contentId} {
       allow get, list: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if false;
     }
 
     match /settings/{settingId} {

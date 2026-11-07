@@ -1,6 +1,6 @@
 # SickleCare Project Status
 
-**Updated:** 6 November 2026
+**Updated:** 7 November 2026
 **Flutter app:** `sicklecare_frontend/`
 **Firebase backend:** `sicklecare_backend/`
 
@@ -9,14 +9,16 @@
 - Flutter tracker entries sync under `users/{uid}/tracker_entries`; backend health validation, analytics, exports, and reports use the same schema.
 - Admin UI visibility is based on the Firebase Auth ID-token `admin` custom claim. Firestore and Storage rules also enforce trusted claims; client profile roles are not trusted.
 - `askSika` is implemented as an authenticated, App Check-protected callable. It uses a server-side Groq secret and excludes tracker/profile data from the request.
-- The mobile `AdminScreen` edits home content and views support messages. There is no separate web admin dashboard.
+- The mobile admin screen and Firebase Hosting web console use trusted admin claims. The web console provides a live summary, paginated account directory, support/contact inbox with status filters, home-content editor, and audit activity view.
+- Admin content and inbox status changes use rate-limited backend callables that validate input and create append-only audit events. The user directory can fetch allowlisted profile fields and paginated, synced health tracker records through an admin-only read callable; each page view creates a metadata-only audit event.
 - Reminders remain local to the device; FCM token registration/cloud push is not integrated.
 - Account deletion has backend cleanup for known user data and Storage paths. The deployed trigger has not been verified.
 
 ## Verification
 
-- Backend TypeScript build, ESLint, and Jest tests passed (10 tests).
-- Flutter analysis and widget tests passed.
+- Backend TypeScript build, ESLint, and Jest tests passed (54 tests including admin authorization and request validation).
+- Admin dashboard strict TypeScript check and production build passed; npm audit reports zero vulnerabilities.
+- Flutter analysis passed after routing the in-app admin editor through the audited callable.
 - Firestore, Storage, and Auth rules loaded in the local Firebase Emulator Suite. No Firebase deployment or production-project query was performed.
 - Android debug APK built successfully for local testing; it is not a Play Store release.
 
@@ -24,7 +26,7 @@
 
 - Provisioning/revoking production admin claims, deployed rules/functions/indexes, production App Check, and external Groq connectivity.
 - Cloud FCM token lifecycle and delivery.
-- A web admin console.
+- Firebase Hosting/custom-domain deployment and real admin-account workflow.
 - Email delivery, PDF reports, and recoverable user-data backups (current reports are JSON; backups are metadata only).
 - Migration of legacy `users/{uid}/health` records into `tracker_entries`.
 - Deployed account-erasure execution, iOS builds, and real-device workflows.

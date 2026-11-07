@@ -12,6 +12,7 @@ import { analyticsFunctions } from './analytics';
 import { reportFunctions } from './reports';
 import { utilityFunctions } from './utils';
 import { askSika } from './ai';
+import { adminFunctions } from './admin';
 
 // Export all functions
 export const {
@@ -50,6 +51,15 @@ export const {
 } = utilityFunctions;
 
 export { askSika };
+
+export const {
+  getAdminDashboardSummary,
+  listAdminUsers,
+  updateAdminInboxStatus,
+  updateAdminHomeContent,
+  getAdminUserDetails,
+  listAdminAuditLogs,
+} = adminFunctions;
 
 // HTTP endpoints for webhooks and external integrations
 export const api = functions.https.onRequest(async (req, res) => {

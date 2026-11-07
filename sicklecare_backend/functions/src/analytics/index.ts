@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 
 const db = admin.firestore();
@@ -238,7 +239,7 @@ async function createUserBackup(userId: string): Promise<void> {
     // Create backup document
     const backupData = {
       userId,
-      backupDate: admin.firestore.FieldValue.serverTimestamp(),
+      backupDate: FieldValue.serverTimestamp(),
       dataSize: JSON.stringify({
         user: userDoc.data(),
         trackerEntries: entriesSnapshot.docs.map(d => d.data()),

@@ -65,6 +65,38 @@ sicklecare_backend/
 
 ## 🔧 Setup Instructions
 
+### Admin dashboard
+
+The secure web console is a Firebase Hosting SPA under `admin/`. It provides a
+dashboard summary, paginated account directory, live support/contact inbox,
+request status changes, and home-content publishing. Dashboard content and
+inbox mutations go through admin-claim protected, rate-limited callables and
+write metadata-only records to `admin_audit_logs`. Individual user details and
+synced tracker entries are available on demand from the user directory through
+an admin-only, read-only, paginated callable; each request is recorded in the
+audit log without including health details. Records still stored only on a
+device are not available to the dashboard. Firestore client rules deny admin
+reads of user profile and tracker documents, so sensitive user data must go
+through this audited callable.
+
+Run the console locally:
+
+```bash
+cd sicklecare_backend/admin
+npm ci
+npm run dev
+```
+
+For isolated local integration testing, copy `.env.example` to `.env.local`
+and run the Auth, Firestore, and Functions emulators first. The web app will
+then connect only to local emulator endpoints.
+
+Authorize administrators only through a trusted Firebase Admin SDK process
+(see the custom-claim instructions below). A successful sign-in without the
+literal boolean `admin: true` claim is denied access. Update the Firebase
+Hosting authorized domains and review the Content Security Policy before
+deploying Hosting. No Firebase service is deployed by these local commands.
+
 ### Step 1: Install Dependencies
 
 ```bash
@@ -110,6 +142,15 @@ firebase deploy --only firestore:indexes
 - Improves performance for health data lookups
 
 ### 4. Cloud Functions (TypeScript → JavaScript)
+
+#### Admin functions
+
+- `getAdminDashboardSummary`: bounded summary counts for accounts and open requests.
+- `listAdminUsers`: read-only, paginated Firebase Auth directory (maximum 50 per page).
+- `getAdminUserDetails`: returns allowlisted account/profile fields and a bounded page of synced tracker entries for one selected user. Every access writes an audit event; tracker fields are never read directly by the browser.
+- `updateAdminInboxStatus`: validates a support/contact status change and records an audit event atomically.
+- `updateAdminHomeContent`: validates bounded home copy and records an audit event atomically.
+- All admin callables require the trusted boolean `admin` custom claim and are rate-limited. Clients cannot write the admin audit collection.
 
 #### User Functions
 - `onUserCreate`: Initialize profile when user signs up
@@ -248,12 +289,49 @@ await entriesRef.doc(entryId).set(trackerEntry);
 
 ### Admin Setup
 
-From `sicklecare_backend/functions`, set administrator claims only in a trusted environment using the Firebase Admin SDK. Never let a client set custom claims or treat a profile document's `role` field as authorization:
+There is no shared or built-in administrator password. The dashboard signs in
+to the same Firebase project as the Flutter app (`sicklecare-15d7a`). To create
+an administrator login:
+
+1. In Firebase Console, open **Authentication → Sign-in method** and enable
+   **Email/Password** if it is not already enabled.
+2. Under **Authentication → Users**, create the administrator's account with
+   an individual, organization-controlled email address and a unique password.
+   Deliver any temporary password through your approved secure channel and
+   change it immediately after sign-in. Do not put credentials in source code,
+   chat, or application configuration.
+3. Copy the new user's **UID**. From `sicklecare_backend/functions`, run the
+   command below in a trusted operator environment after configuring
+   Application Default Credentials for the `sicklecare-15d7a` project.
+4. Sign in to the dashboard with that Firebase Authentication email and
+   password. After granting the claim, sign out and sign back in (or use
+   **Refresh access**) so Firebase issues a token containing the new claim.
+
+The claim command preserves existing custom claims. Never let a client set
+custom claims or treat a profile document's `role` field as authorization:
+
 ```bash
-node -e "const admin=require('firebase-admin'); admin.initializeApp(); (async()=>{const uid=process.argv[1]; const user=await admin.auth().getUser(uid); await admin.auth().setCustomUserClaims(uid,{...(user.customClaims||{}),admin:true})})().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})" USER_UID
+node -e "const admin=require('firebase-admin'); admin.initializeApp({projectId:'sicklecare-15d7a'}); (async()=>{const uid=process.argv[1]; const user=await admin.auth().getUser(uid); await admin.auth().setCustomUserClaims(uid,{...(user.customClaims||{}),admin:true})})().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})" USER_UID
 ```
 
-Run this only where Application Default Credentials are configured for an authorized operator. Ask the user to refresh their ID token after changing claims.
+Run this only where Application Default Credentials are configured for an
+authorized operator, with the intended Firebase project selected. Do not
+download or commit service-account private keys. A signed-in account without
+the literal boolean `admin: true` claim is denied dashboard access.
+
+The dashboard reads Firebase Auth account metadata, the user's saved name,
+phone, and genotype, support/contact requests, public home content, and
+metadata-only admin audit events. When an administrator explicitly opens a
+user's details, the dashboard can also read that user's synced tracker records
+(pain score, hydration, mood, and notes) through `getAdminUserDetails`. The
+callable requires the trusted admin claim, rate-limits requests, returns only
+allowlisted fields in pages of at most 25, and records the actor, target user,
+and record count in `admin_audit_logs`. It does not permit health-data writes.
+
+The Flutter app keeps tracker data in local Hive storage and syncs it to
+`users/{uid}/tracker_entries` after sign-in. Records that have not synced from
+the user's device cannot be fetched remotely. Do not copy health record values
+into logs, screenshots, support tickets, or exports.
 
 ## 📊 Firestore Collections
 

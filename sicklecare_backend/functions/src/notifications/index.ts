@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { FieldValue } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 import { checkRateLimit } from '../utils';
 
@@ -59,8 +60,8 @@ export const scheduleReminders = functions.https.onCall(async (data, context) =>
       repeat,
       active: true,
       completed: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       nextNotificationTime: new Date(time)
     };
 
@@ -166,7 +167,7 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
       type,
       data: notificationData,
       sent: true,
-      sentAt: admin.firestore.FieldValue.serverTimestamp()
+      sentAt: FieldValue.serverTimestamp()
     });
 
     console.log('Notification sent to user:', userId, 'Message ID:', response);
@@ -220,13 +221,13 @@ export const processNotificationQueue = functions.pubsub
           if (nextTime) {
             await doc.ref.update({
               nextNotificationTime: nextTime,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+              updatedAt: FieldValue.serverTimestamp()
             });
           } else {
             // Mark as inactive if no more notifications
             await doc.ref.update({
               active: false,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+              updatedAt: FieldValue.serverTimestamp()
             });
           }
 
@@ -336,7 +337,7 @@ async function storeNotification(
 
     await notificationsRef.add({
       ...notificationData,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       read: false
     });
   } catch (error) {
@@ -367,7 +368,7 @@ export const markNotificationAsRead = functions.https.onCall(async (data, contex
 
     await notificationRef.update({
       read: true,
-      readAt: admin.firestore.FieldValue.serverTimestamp()
+      readAt: FieldValue.serverTimestamp()
     });
 
     return {

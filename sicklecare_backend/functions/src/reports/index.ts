@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 
 const db = admin.firestore();
@@ -61,9 +62,9 @@ export const generateHealthReport = functions.https.onCall(async (data, context)
       .collection('reports').doc();
     await reportRef.set({
       report,
-      generatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      startDate: admin.firestore.Timestamp.fromDate(start),
-      endDate: admin.firestore.Timestamp.fromDate(end),
+      generatedAt: FieldValue.serverTimestamp(),
+      startDate: Timestamp.fromDate(start),
+      endDate: Timestamp.fromDate(end),
       format,
     });
 
@@ -222,7 +223,7 @@ async function sendReportToUser(
     // Store report in user's collection
     await db.collection('users').doc(userId).collection('reports').add({
       report,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       read: false
     });
 

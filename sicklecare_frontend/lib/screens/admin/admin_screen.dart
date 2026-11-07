@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../l10n/strings.dart';
 import '../../widgets/section_card.dart';
-import '../../services/firestore_service.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -55,10 +55,11 @@ class _AdminScreenState extends State<AdminScreen> {
     final l = context.l10n;
     setState(() => _saving = true);
     try {
-      await FirestoreService.updateContent('home', {
+      await FirebaseFunctions.instance
+          .httpsCallable('updateAdminHomeContent')
+          .call({
         'heroTitle': _heroTitle.text.trim(),
         'heroBody': _heroBody.text.trim(),
-        'updatedAt': FieldValue.serverTimestamp(),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
