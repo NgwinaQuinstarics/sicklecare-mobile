@@ -23,6 +23,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _loading = false;
   bool _obscure = true;
   bool _acceptTerms = false;
+  String _requestedAccountType = 'patient';
   String? _error;
   late final TapGestureRecognizer _termsTap;
   late final TapGestureRecognizer _privacyTap;
@@ -79,32 +80,62 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
     try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _pass.text,
-      );
+      final email = _email.text.trim();
+      final auth = FirebaseAuth.instance;
+      final currentUser = auth.currentUser;
+      final user = currentUser?.email?.toLowerCase() == email.toLowerCase()
+          ? currentUser!
+          : (await auth.createUserWithEmailAndPassword(
+              email: email,
+              password: _pass.text,
+            ))
+              .user!;
       try {
-        await cred.user?.updateDisplayName(_name.text.trim());
+        await user.updateDisplayName(_name.text.trim());
       } catch (e) {
         debugPrint('updateDisplayName failed (known Pigeon bug): $e');
       }
-      // Firestore profile creation — non-fatal if rules block it.
-      // The profile will be created/merged on next login via AuthProvider.
+
+      final profileRef =
+          FirebaseFirestore.instance.collection('users').doc(user.uid);
       try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(cred.user!.uid)
-            .set({
-          'name': _name.text.trim(),
-          'email': _email.text.trim(),
-          'genotype': _genotype.text.trim(),
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final profile = await transaction.get(profileRef);
+          final profileData = {
+            'name': _name.text.trim(),
+            'email': email,
+            'genotype': _genotype.text.trim(),
+            'requestedAccountType': _requestedAccountType,
+          };
+
+          if (profile.exists) {
+            transaction.set(
+              profileRef,
+              profileData,
+              SetOptions(merge: true),
+            );
+          } else {
+            transaction.set(profileRef, {
+              ...profileData,
+              'uid': user.uid,
+              'role': 'patient',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
         });
-      } catch (firestoreErr) {
-        debugPrint('Firestore profile write failed (non-fatal): $firestoreErr');
+      } catch (profileError) {
+        debugPrint('Failed to save signup profile: $profileError');
+        if (mounted) {
+          setState(
+            () => _error = context.l10n.tr(
+              'Your account exists, but its profile could not be saved. Check your connection and tap Create account to retry.',
+              'Votre compte existe, mais son profil n’a pas pu être enregistré. Vérifiez votre connexion et appuyez sur Créer un compte pour réessayer.',
+            ),
+          );
+        }
+        return;
       }
-      // Pop the signup screen so the user automatically lands on MainShell
+
       if (mounted) Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
       final msg = e.message?.toLowerCase() ?? '';
@@ -170,6 +201,41 @@ class _SignupScreenState extends State<SignupScreen> {
                         style: GoogleFonts.poppins(
                             fontSize: 24, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 24),
+                    DropdownButtonFormField<String>(
+                      initialValue: _requestedAccountType,
+                      decoration: InputDecoration(
+                        labelText: l.tr('Account type', 'Type de compte'),
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'patient',
+                          child: Text(l.tr('Patient', 'Patient')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'doctor',
+                          child: Text(l.tr('Doctor', 'Médecin')),
+                        ),
+                      ],
+                      onChanged: _loading
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _requestedAccountType = value);
+                              }
+                            },
+                    ),
+                    if (_requestedAccountType == 'doctor') ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l.tr(
+                          'Doctor registration creates a standard account only. It does not verify credentials or grant access to patient records.',
+                          'L’inscription médecin crée uniquement un compte standard. Elle ne vérifie pas les qualifications et ne donne pas accès aux dossiers des patients.',
+                        ),
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
                     TextFormField(
                       controller: _name,
                       decoration: InputDecoration(

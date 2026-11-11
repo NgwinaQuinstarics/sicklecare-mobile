@@ -19,8 +19,10 @@ The new `sicklecare_backend` folder contains:
    - Owner-scoped health data and validated writes
    - Admin/support access based on trusted Firebase custom claims
    - Profile fields cannot grant or change privileged roles
+   - The signup-selected `requestedAccountType` is self-reported metadata only;
+     doctor selection does not grant privileges or patient-data access
 
-2. **Storage Security** (`storage.rules`)
+   2. **Storage Security** (`storage.rules`)
    - Secure file upload/download
    - File type and size validation
    - User-specific storage buckets
@@ -37,7 +39,7 @@ The new `sicklecare_backend` folder contains:
 
 ## 📋 Prerequisites
 
-1. **Node.js 18+** installed
+1. **Node.js 22** installed
 2. **Firebase CLI** installed: `npm install -g firebase-tools`
 3. **Firebase Project** (you already have this from Flutter app setup)
 
@@ -165,14 +167,14 @@ firebase deploy --only firestore:indexes
 #### Admin functions
 
 - `getAdminDashboardSummary`: bounded summary counts for accounts and open requests.
-- `listAdminUsers`: read-only, paginated Firebase Auth directory (maximum 50 per page).
+- `listAdminUsers`: read-only, paginated Firebase Auth directory (maximum 50 per page), including the account type saved in each profile.
 - `getAdminUserDetails`: returns allowlisted account/profile fields and a bounded page of synced tracker entries for one selected user. Every access writes an audit event; tracker fields are never read directly by the browser.
 - `updateAdminInboxStatus`: validates a support/contact status change and records an audit event atomically.
 - `updateAdminHomeContent`: validates bounded home copy and records an audit event atomically.
 - All admin callables require the trusted boolean `admin` custom claim and are rate-limited. Clients cannot write the admin audit collection.
 
 #### User Functions
-- `onUserCreate`: Initialize profile when user signs up
+- `onUserCreate`: Initialize or fill missing profile defaults when a user signs up without overwriting signup data
 - `onUserDelete`: Clean up user-owned Firestore and Storage data when account is deleted
 - `updateUserProfile`: Update user settings/profile
 

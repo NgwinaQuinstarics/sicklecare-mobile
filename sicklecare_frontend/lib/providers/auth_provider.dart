@@ -8,23 +8,26 @@ import '../services/privacy_data_service.dart';
 class AuthProvider extends ChangeNotifier {
   User? get user => FirebaseAuth.instance.currentUser;
   Map<String, dynamic>? _profile;
+  String? _profileError;
   StreamSubscription<User?>? _authSubscription;
   bool _isAdmin = false;
 
   Map<String, dynamic>? get profile => _profile;
+  String? get profileError => _profileError;
 
   bool get isAdmin => _isAdmin;
 
   AuthProvider() {
     _authSubscription = FirebaseAuth.instance.idTokenChanges().listen(
-      _handleAuthChange,
-    );
+          _handleAuthChange,
+        );
   }
 
   Future<void> _handleAuthChange(User? u) async {
     if (u == null) {
       _isAdmin = false;
       _profile = null;
+      _profileError = null;
       notifyListeners();
       return;
     }
@@ -44,6 +47,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> loadProfile() async {
     final u = user;
     if (u == null) return;
+    _profileError = null;
     try {
       final ref = FirebaseFirestore.instance.collection('users').doc(u.uid);
       final doc = await ref.get();
@@ -55,20 +59,18 @@ class AuthProvider extends ChangeNotifier {
         final data = <String, dynamic>{
           'name': u.displayName ?? '',
           'email': u.email ?? '',
-          'role': 'user',
+          'role': 'patient',
           'createdAt': FieldValue.serverTimestamp(),
         };
-        try {
-          await ref.set(data);
-          _profile = data;
-        } catch (_) {
-          // If Firestore rules still block, keep profile null — app still works.
-          _profile = data; // Use local fallback so the app doesn't break.
-        }
+        await ref.set(data);
+        _profile = data;
       }
       notifyListeners();
     } catch (error) {
       debugPrint('Failed to load user profile: $error');
+      _profile = null;
+      _profileError = 'User profile could not be loaded or saved.';
+      notifyListeners();
     }
   }
 

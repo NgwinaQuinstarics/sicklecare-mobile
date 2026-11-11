@@ -17,44 +17,60 @@ const db = admin.firestore();
 export const onUserCreate = functions.auth.user().onCreate(async (user) => {
   try {
     const userRef = db.collection('users').doc(user.uid);
-    
-    // Create initial user profile
-    await userRef.set({
-      uid: user.uid,
-      email: user.email || '',
-      displayName: user.displayName || '',
-      photoURL: user.photoURL || '',
-      role: 'patient', // Default role
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      settings: {
-        notifications: {
-          enabled: true,
-          medication: true,
-          hydration: true,
-          appointment: true
+
+    await db.runTransaction(async (transaction) => {
+      const profile = await transaction.get(userRef);
+      const defaults = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+        role: 'patient',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        settings: {
+          notifications: {
+            enabled: true,
+            medication: true,
+            hydration: true,
+            appointment: true
+          },
+          privacy: {
+            shareHealthData: false,
+            shareWithDoctors: false,
+            anonymousAnalytics: true
+          },
+          preferences: {
+            language: 'en',
+            theme: 'light',
+            measurementSystem: 'metric'
+          }
         },
-        privacy: {
-          shareHealthData: false,
-          shareWithDoctors: false,
-          anonymousAnalytics: true
-        },
-        preferences: {
-          language: 'en',
-          theme: 'light',
-          measurementSystem: 'metric'
+        healthStats: {
+          totalEntries: 0,
+          lastEntryDate: null,
+          averagePainLevel: 0,
+          averageHydration: 0,
+          streakDays: 0
         }
-      },
-      healthStats: {
-        totalEntries: 0,
-        lastEntryDate: null,
-        averagePainLevel: 0,
-        averageHydration: 0,
-        streakDays: 0
+      };
+
+      if (!profile.exists) {
+        transaction.create(userRef, defaults);
+        return;
+      }
+
+      const existing = profile.data() ?? {};
+      const missingFields: FirebaseFirestore.DocumentData = {};
+      for (const [field, value] of Object.entries(defaults)) {
+        if (!(field in existing)) missingFields[field] = value;
+      }
+      if (Object.keys(missingFields).length > 0) {
+        transaction.update(userRef, missingFields);
       }
     });
 
-    console.log(`User profile created for: ${user.uid}`);
+    console.log(`User profile ensured for: ${user.uid}`);
     
     return null;
   } catch (error) {

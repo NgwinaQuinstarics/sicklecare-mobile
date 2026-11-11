@@ -846,7 +846,17 @@ export function UsersView() {
                   <td>
                     <div className="table-user">
                       <span className="table-avatar">{(user.displayName || user.email || 'U').slice(0, 1).toUpperCase()}</span>
-                      <span><strong>{user.displayName || 'Unnamed account'}</strong><small>ID {user.uid.slice(0, 8)}…</small></span>
+                      <span>
+                        <strong>{user.displayName || 'Unnamed account'}</strong>
+                        <small>
+                          {user.requestedAccountType === 'doctor'
+                            ? 'Doctor account · self-reported'
+                            : user.requestedAccountType === 'patient'
+                              ? 'Patient account'
+                              : 'Account type not set'}
+                        </small>
+                        <small>ID {user.uid.slice(0, 8)}…</small>
+                      </span>
                     </div>
                   </td>
                   <td>
@@ -941,6 +951,13 @@ export function UsersView() {
                   <div><span>Email</span><strong>{userDetails.user.email || '—'}</strong></div>
                   <div><span>Phone</span><strong>{userDetails.user.phone || '—'}</strong></div>
                   <div><span>Genotype</span><strong>{userDetails.user.genotype || '—'}</strong></div>
+                  <div><span>Account type</span><strong>
+                    {userDetails.user.requestedAccountType === 'doctor'
+                      ? 'Doctor account · self-reported'
+                      : userDetails.user.requestedAccountType === 'patient'
+                        ? 'Patient account'
+                        : 'Not set'}
+                  </strong></div>
                   <div><span>Account status</span><strong>{userDetails.user.disabled ? 'Disabled' : 'Active'}</strong></div>
                   <div><span>Role</span><strong>{userDetails.user.role || '—'}</strong></div>
                   <div><span>Account created</span><strong>{formatDate(userDetails.user.profileCreatedAt)}</strong></div>

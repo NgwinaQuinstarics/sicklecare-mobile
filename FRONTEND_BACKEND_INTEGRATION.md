@@ -10,13 +10,14 @@ No production user records were read.
 
 | Workflow | Flutter contract | Backend contract | Status |
 |---|---|---|---|
-| Sign-in and profile | Firebase Auth; `users/{uid}` | Auth creation initializes the profile; Firestore rules allow bounded owner profile fields | Aligned |
+| Sign-in and profile | Firebase Authentication stores credentials; `users/{uid}` stores the app profile | Auth creation initializes/merges profile defaults; rules allow bounded owner profile fields | Aligned; passwords are never written to Firestore |
+| Patient/doctor account type | Signup offers patient or doctor account type | Stores `requestedAccountType` on the owner profile; this self-reported field grants no role, claims, or patient-data access | Implemented; doctor accounts still use the existing app and have no doctor portal |
 | Admin access | Mobile and web consoles read the Auth ID-token `admin` claim | Firestore/Storage rules and admin callables check trusted claims | Aligned; claim grant/revocation remains an operator task |
 | Tracker | Hive offline store; sync to `users/{uid}/tracker_entries/{entryId}` with `id`, ISO `date`, integer `painLevel`, integer `hydrationMl`, `mood`, `notes` | Rules and the health trigger validate this payload; analytics, export, and JSON reports query `tracker_entries` | Aligned for new app writes |
 | Legacy health records | No current Flutter writes to `users/{uid}/health` | Existing legacy records are not automatically migrated | Migration not performed |
 | Sika online chat | Consent-gated `askSika` callable sends prompt and up to six recent messages; tracker/profile data are not included | Authenticated, App Check-protected callable; bounded inputs, per-user rate limit, Groq key from Secret Manager | Source aligned; provider secret and production App Check configuration must be provisioned |
 | Support | Signed-in submissions to `support_messages`; signed-out submissions to `contacts` | Rules validate submissions; only trusted admins can read/manage messages | Aligned |
-| Admin console | React/Vite Hosting SPA: summary, paginated Auth directory, live inbox, content editor, recent activity | Admin-claim callables provide summary/list reads and validate/audit writes | Source implemented; production callables and Hosting are not deployed; Blaze plan required |
+| Admin console | React/Vite Hosting SPA: summary, paginated Auth directory with requested account type, live inbox, content editor, recent activity | Admin-claim callables provide summary/list reads and validate/audit writes | Source implemented; production callables and Hosting are not deployed; Blaze plan required |
 | Admin content | `content/home`; mobile and web editors publish title/body through callable | Public content reads; direct client writes denied; bounded admin callable writes and logs audit metadata | Implemented |
 | Admin activity | Read-only activity view for administrative content/inbox changes | Append-only audit records written/read through admin-only callables | Implemented for dashboard/mobile editor actions |
 | Reminders and push | Hive and local device alarms | Legacy cloud reminder/FCM functions remain separate; Flutter does not register FCM tokens | Local reminders work; cloud push is not integrated |
@@ -33,15 +34,17 @@ the backend directory after reviewing the selected Firebase project.
 
 ## Local verification performed
 
-- Backend TypeScript build, ESLint, and Jest schema tests passed (10 tests).
-- Admin backend build/lint and Jest tests passed; the admin dashboard production build and dependency audit passed.
-- Flutter static analysis and widget tests passed.
+- Backend TypeScript build and ESLint passed; Jest: 54 tests passed.
+- Admin dashboard TypeScript check and production build passed.
+- Flutter static analysis passed.
 - Current Firestore, Storage, and Auth rules loaded in the local Firebase
   Emulator Suite. This confirms emulator startup/rule loading, not a full
   authorization test of the latest rule edits.
 - Earlier local checks exercised owner access, cross-user denial,
   profile-role escalation denial, admin-claim access, and sequential and
   concurrent rate-limit requests against the earlier rules version.
+- Latest Firestore rules compiled in a Firebase CLI dry run. New account-type
+  authorization behavior was not tested against a production project.
 - Flutter built the Android debug APK successfully using a temporary local
   Firebase Android configuration generated from the checked-in FlutterFire
   options. The ignored config was removed afterward; the APK is a local

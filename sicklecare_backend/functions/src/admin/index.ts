@@ -95,17 +95,28 @@ export const listAdminUsers = functions.https.onCall(async (data, context) => {
 
   try {
     const result = await admin.auth().listUsers(page.pageSize, page.pageToken);
+    const profiles = result.users.length > 0 ? await db.getAll(
+      ...result.users.map((user) => db.collection('users').doc(user.uid)),
+    ) : [];
 
     return {
-      users: result.users.map((user) => ({
-        uid: user.uid,
-        email: user.email ?? null,
-        displayName: user.displayName ?? null,
-        disabled: user.disabled,
-        emailVerified: user.emailVerified,
-        createdAt: user.metadata.creationTime,
-        lastSignInAt: user.metadata.lastSignInTime ?? null,
-      })),
+      users: result.users.map((user, index) => {
+        const requestedAccountType =
+          profiles[index].data()?.requestedAccountType;
+        return {
+          uid: user.uid,
+          email: user.email ?? null,
+          displayName: user.displayName ?? null,
+          disabled: user.disabled,
+          emailVerified: user.emailVerified,
+          createdAt: user.metadata.creationTime,
+          lastSignInAt: user.metadata.lastSignInTime ?? null,
+          requestedAccountType:
+            requestedAccountType === 'patient' ||
+            requestedAccountType === 'doctor' ?
+              requestedAccountType : null,
+        };
+      }),
       nextPageToken: result.pageToken ?? null,
     };
   } catch (error) {
@@ -292,6 +303,10 @@ export const getAdminUserDetails = functions.https.onCall(
             profile.genotype : null,
           phone: typeof profile.phone === 'string' ? profile.phone : null,
           role: typeof profile.role === 'string' ? profile.role : null,
+          requestedAccountType:
+            profile.requestedAccountType === 'patient' ||
+            profile.requestedAccountType === 'doctor' ?
+              profile.requestedAccountType : null,
           profileCreatedAt,
         },
         entries: pageDocs.map((entry) => {

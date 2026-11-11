@@ -14,6 +14,7 @@ export interface AdminUser {
   uid: string;
   email: string | null;
   displayName: string | null;
+  requestedAccountType: 'patient' | 'doctor' | null;
   disabled: boolean;
   emailVerified: boolean;
   createdAt: string;
