@@ -95,7 +95,26 @@ Authorize administrators only through a trusted Firebase Admin SDK process
 (see the custom-claim instructions below). A successful sign-in without the
 literal boolean `admin: true` claim is denied access. Update the Firebase
 Hosting authorized domains and review the Content Security Policy before
-deploying Hosting. No Firebase service is deployed by these local commands.
+deploying Hosting. The Hosting site is explicitly configured as
+`sicklecare-15d7a`.
+
+Cloud Functions deployment requires the Firebase project to use the Blaze
+(pay-as-you-go) plan so Firebase can enable Cloud Build and related APIs.
+Review the expected usage and configure billing alerts before upgrading. The
+dashboard depends on its callable functions; deploying Hosting without those
+functions does not make the dashboard data workflows operational. After
+enabling billing, first review and remediate the production dependency audit:
+`npm audit --omit=dev` currently reports 18 advisories, including one critical
+and ten high severity. Do not apply `npm audit fix --force` without reviewing
+the proposed major-version upgrades and validating the Functions. Then deploy
+the dashboard functions, Firestore rules, and Hosting together from this
+directory:
+
+```bash
+firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent,firestore:rules,hosting" --project sicklecare-15d7a
+```
+
+No Firebase service has been deployed by the local build/test commands.
 
 ### Step 1: Install Dependencies
 

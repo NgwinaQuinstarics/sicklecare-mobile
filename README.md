@@ -73,6 +73,11 @@ Deployments are **not** performed by these local build/test commands. Before
 deploying, review Firebase project selection, App Check configuration, billing,
 indexes, and security rules. Only trusted operators should grant custom Auth
 claims; a Firestore profile role is not authorization.
+Cloud Functions deployment requires the Firebase project to use the Blaze
+(pay-as-you-go) plan. Review usage and configure billing alerts, then follow the
+targeted deployment command in
+[`sicklecare_backend/BACKEND_SETUP.md`](./sicklecare_backend/BACKEND_SETUP.md)
+to publish the admin callables, Firestore rules, and Hosting app together.
 
 ## Verification
 

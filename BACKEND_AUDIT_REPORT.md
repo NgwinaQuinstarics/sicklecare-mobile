@@ -1,11 +1,11 @@
 # SickleCare Backend Integration Audit
 
-**Updated:** 7 November 2026
-**Scope:** Source/configuration review and local build/test verification for the Flutter app and Firebase backend. No production Firebase project, production data, or deployed service was accessed.
+**Updated:** 11 November 2026
+**Scope:** Source/configuration review, local build/test verification, and read-only Firebase deployment metadata checks. No production user records were read.
 
 ## Summary
 
-The Flutter app is in `sicklecare_frontend/`; the TypeScript Cloud Functions and canonical Firebase CLI configuration are in `sicklecare_backend/`. The backend project alias matches the Flutter Firebase project ID (`sicklecare-15d7a`). No Firebase deployment was performed.
+The Flutter app is in `sicklecare_frontend/`; the TypeScript Cloud Functions and canonical Firebase CLI configuration are in `sicklecare_backend/`. The backend project alias matches the Flutter Firebase project ID (`sicklecare-15d7a`). No Firebase service was deployed. The Firebase CLI reports no deployed Cloud Functions in the production project.
 
 The project now includes an in-app Flutter admin screen and a Firebase Hosting web console. The web console provides a summary, paginated Auth account directory, live support/contact inbox, status management, home-content publishing, and recent audit events. It uses Firebase Auth ID-token claims for UI gating and admin-only, rate-limited Cloud Functions for sensitive reads/writes. Firestore and Storage rules also rely on trusted claims; client-editable profile fields are not an authorization source.
 
@@ -24,16 +24,18 @@ The project now includes an in-app Flutter admin screen and a Firebase Hosting w
 
 ## Local verification
 
-- Backend TypeScript build, ESLint, and Jest tests passed (45 tests).
-- Admin dashboard strict TypeScript check and production build passed; npm audit reports zero vulnerabilities.
+- Backend TypeScript build, ESLint, and Jest tests passed (54 tests).
+- Admin dashboard strict TypeScript check and production build passed.
 - Flutter analysis passed after the in-app admin editor was switched to the audited callable.
 - Browser review verified sign-in/access-denied states and responsive desktop/mobile layouts. No production account was used to test data-bearing pages.
 - Current Firestore, Storage, and Auth rules loaded in the local Firebase Emulator Suite. The emulator process exited successfully; Java emitted a deprecated-API warning.
+- Firebase CLI dry run compiled the Firestore rules and production Hosting bundle. The Functions deployment dry run was blocked because Cloud Build cannot be enabled unless the project is upgraded to Blaze. The Hosting site is now explicitly mapped to `sicklecare-15d7a` in `firebase.json`.
 - Flutter built the Android debug APK successfully using a temporary local Firebase Android configuration generated from the checked-in FlutterFire options. That ignored config was removed afterward, and the APK is a testing artifact, not a Play Store release.
 
 ## Remaining limitations
 
-- No Firebase service was deployed or queried. Production rules, indexes, functions, App Check enforcement, and custom-claim provisioning remain unverified.
+- No Firebase service was deployed, and no production user records were read. Production Functions, rules, indexes, and App Check behavior remain unverified.
+- Cloud Functions deployment requires upgrading the project to Blaze and configuring billing; see `sicklecare_backend/BACKEND_SETUP.md`.
 - Firebase Hosting domain authorization and deployment are not configured or verified.
 - `GROQ_API_KEY` must be provisioned in Firebase Secret Manager and App Check configured before online AI requests can work in a deployed environment.
 - Reminders are local-only in Flutter; FCM token registration and cloud push delivery are not integrated.

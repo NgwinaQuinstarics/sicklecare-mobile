@@ -14,6 +14,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "sicklecare-15d7a",
     "public": "admin/dist",
     "ignore": [
       "firebase.json",

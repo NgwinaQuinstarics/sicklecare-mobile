@@ -1,6 +1,6 @@
 # SickleCare Project Status
 
-**Updated:** 7 November 2026
+**Updated:** 11 November 2026
 **Flutter app:** `sicklecare_frontend/`
 **Firebase backend:** `sicklecare_backend/`
 
@@ -19,12 +19,14 @@
 - Backend TypeScript build, ESLint, and Jest tests passed (54 tests including admin authorization and request validation).
 - Admin dashboard strict TypeScript check and production build passed; npm audit reports zero vulnerabilities.
 - Flutter analysis passed after routing the in-app admin editor through the audited callable.
-- Firestore, Storage, and Auth rules loaded in the local Firebase Emulator Suite. No Firebase deployment or production-project query was performed.
+- Backend and admin dashboard builds pass; all 54 Functions tests pass. Firestore rules compile in the Firebase CLI dry run.
+- Firebase CLI confirms there are currently no deployed Cloud Functions in `sicklecare-15d7a`. A targeted production dry run was blocked because the project is not on the Blaze plan and Cloud Build cannot be enabled. No Functions, rules, Hosting, or production user records were deployed/read.
 - Android debug APK built successfully for local testing; it is not a Play Store release.
 
 ## Not yet verified or implemented
 
-- Provisioning/revoking production admin claims, deployed rules/functions/indexes, production App Check, and external Groq connectivity.
+- Deploying the admin callables, Firestore rules, and Hosting app. Cloud Functions deployment requires Blaze; see `sicklecare_backend/BACKEND_SETUP.md`.
+- Production App Check, external Groq connectivity, and scheduled jobs.
 - Cloud FCM token lifecycle and delivery.
 - Firebase Hosting/custom-domain deployment and real admin-account workflow.
 - Email delivery, PDF reports, and recoverable user-data backups (current reports are JSON; backups are metadata only).

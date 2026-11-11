@@ -1,8 +1,12 @@
 # Frontend/backend integration
 
-**Reviewed:** 7 November 2026
+**Reviewed:** 11 November 2026
 **Firebase project in checked-in config:** `sicklecare-15d7a`
-**Deployment status:** No Firebase services were deployed or queried.
+**Deployment status:** Admin deployment is blocked until the project uses the
+Blaze plan. Firebase CLI lists no deployed Cloud Functions in this project. A
+dry run confirmed the admin Functions, Firestore rules, and Hosting build
+compile; it stopped because Cloud Build cannot be enabled on the current plan.
+No production user records were read.
 
 | Workflow | Flutter contract | Backend contract | Status |
 |---|---|---|---|
@@ -12,7 +16,7 @@
 | Legacy health records | No current Flutter writes to `users/{uid}/health` | Existing legacy records are not automatically migrated | Migration not performed |
 | Sika online chat | Consent-gated `askSika` callable sends prompt and up to six recent messages; tracker/profile data are not included | Authenticated, App Check-protected callable; bounded inputs, per-user rate limit, Groq key from Secret Manager | Source aligned; provider secret and production App Check configuration must be provisioned |
 | Support | Signed-in submissions to `support_messages`; signed-out submissions to `contacts` | Rules validate submissions; only trusted admins can read/manage messages | Aligned |
-| Admin console | React/Vite Hosting SPA: summary, paginated Auth directory, live inbox, content editor, recent activity | Admin-claim callables provide summary/list reads and validate/audit writes | Implemented; Firebase Hosting deployment and authorized-domain configuration remain |
+| Admin console | React/Vite Hosting SPA: summary, paginated Auth directory, live inbox, content editor, recent activity | Admin-claim callables provide summary/list reads and validate/audit writes | Source implemented; production callables and Hosting are not deployed; Blaze plan required |
 | Admin content | `content/home`; mobile and web editors publish title/body through callable | Public content reads; direct client writes denied; bounded admin callable writes and logs audit metadata | Implemented |
 | Admin activity | Read-only activity view for administrative content/inbox changes | Append-only audit records written/read through admin-only callables | Implemented for dashboard/mobile editor actions |
 | Reminders and push | Hive and local device alarms | Legacy cloud reminder/FCM functions remain separate; Flutter does not register FCM tokens | Local reminders work; cloud push is not integrated |
@@ -46,3 +50,10 @@ the backend directory after reviewing the selected Firebase project.
 Production Firebase state, external Groq connectivity, real-device behavior,
 App Check enforcement, scheduled jobs, and account-erasure completion still
 require an authorized project and device validation.
+
+The Firebase CLI Hosting site is explicitly set to
+`sicklecare-15d7a`. Once the project is upgraded to Blaze and billing alerts
+are configured, use the targeted deployment command in
+`sicklecare_backend/BACKEND_SETUP.md` to publish the admin callables, rules,
+and dashboard together. Device-only tracker entries and local reminders are
+not stored in Firestore and therefore cannot be fetched by the dashboard.
