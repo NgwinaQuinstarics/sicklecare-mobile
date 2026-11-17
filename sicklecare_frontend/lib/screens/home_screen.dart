@@ -139,6 +139,31 @@ class DashboardScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 26),
           children: [
+            if (auth.profileError != null)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_off_outlined, color: cs.error),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          l.tr(
+                            'Your profile could not sync. Check your connection and retry.',
+                            'Votre profil n’a pas pu être synchronisé. Vérifiez votre connexion et réessayez.',
+                          ),
+                          style: TextStyle(color: cs.onSurface),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: auth.loadProfile,
+                        child: Text(l.retry),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Row(
               children: [
                 Expanded(

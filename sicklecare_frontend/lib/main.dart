@@ -21,23 +21,28 @@ import 'auth_gate.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase before loading app state.
-  Future<FirebaseApp?> initFirebase() async {
-    try {
-      return await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    } catch (e) {
-      debugPrint('Firebase init error: $e');
-      return null;
-    }
+  try {
+    await _initializeFirebase();
+  } catch (error, stackTrace) {
+    debugPrint('Firebase initialization failed: $error\n$stackTrace');
+    runApp(FirebaseStartupErrorApp(onRetry: _retryStartup));
+    return;
   }
 
-  await initFirebase();
+  await _initializeLocalServices();
+  runApp(const SickleCareApp());
+}
 
+Future<void> _initializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) return;
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
+
+Future<void> _initializeLocalServices() async {
   await AppSecurityService.instance.init();
 
-  // Phase 2: Hive init, then open all boxes in parallel.
   try {
     await Hive.initFlutter();
     await Future.wait([
@@ -55,8 +60,110 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('AlarmService init error: $e');
   }
+}
 
+Future<void> _retryStartup() async {
+  await _initializeFirebase();
+  await _initializeLocalServices();
   runApp(const SickleCareApp());
+}
+
+class FirebaseStartupErrorApp extends StatefulWidget {
+  const FirebaseStartupErrorApp({required this.onRetry, super.key});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  State<FirebaseStartupErrorApp> createState() =>
+      _FirebaseStartupErrorAppState();
+}
+
+class _FirebaseStartupErrorAppState extends State<FirebaseStartupErrorApp> {
+  bool _retrying = false;
+  String? _errorMessage;
+
+  Future<void> _retry() async {
+    setState(() {
+      _retrying = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onRetry();
+    } catch (error, stackTrace) {
+      debugPrint('Firebase startup retry failed: $error\n$stackTrace');
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Connection still unavailable. Check your internet connection and try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SickleCare',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/appicon.jpeg',
+                      width: 88,
+                      height: 88,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'SickleCare could not connect',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Your account and health data need a secure Firebase connection. Check your internet connection and try again.',
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: _retrying ? null : _retry,
+                      child: _retrying
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Retry connection'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class SickleCareApp extends StatelessWidget {
