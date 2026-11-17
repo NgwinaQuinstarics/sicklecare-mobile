@@ -63,7 +63,6 @@ dependencies:
   package_info_plus: ^9.0.1
   awesome_notifications: ^0.12.0
   firebase_app_check: ^0.3.2
-  firebase_storage: ^12.4.10
   file_picker: ^11.0.3
 
 dev_dependencies:

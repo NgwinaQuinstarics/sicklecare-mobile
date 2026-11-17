@@ -58,13 +58,48 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<Widget> _resolveDestination(User user) async {
-    final token = await user.getIdTokenResult();
-    final application = await FirebaseFirestore.instance
-        .collection('doctor_applications')
-        .doc(user.uid)
-        .get();
+    bool hasDoctorClaim;
+    try {
+      final token = await user.getIdTokenResult();
+      hasDoctorClaim = token.claims?['doctor'] == true;
+    } catch (error) {
+      debugPrint(
+          'Unable to verify professional access; using patient access: $error');
+      return const MainShell();
+    }
+    DocumentSnapshot<Map<String, dynamic>> profile;
+    try {
+      profile = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+    } catch (error) {
+      debugPrint('Unable to check professional account status: $error');
+      if (!hasDoctorClaim) return const MainShell();
+      rethrow;
+    }
+
+    final profileData = profile.data();
+    final hasDoctorApplication =
+        profileData?['requestedAccountType'] == 'doctor' ||
+            profileData?['doctorStatus'] is String;
+    if (!hasDoctorClaim && !hasDoctorApplication) {
+      return const MainShell();
+    }
+
+    DocumentSnapshot<Map<String, dynamic>> application;
+    try {
+      application = await FirebaseFirestore.instance
+          .collection('doctor_applications')
+          .doc(user.uid)
+          .get();
+    } catch (error) {
+      debugPrint('Unable to load professional application status: $error');
+      if (!hasDoctorClaim) return const MainShell();
+      rethrow;
+    }
     if (!application.exists) {
-      if (token.claims?['doctor'] == true) {
+      if (hasDoctorClaim) {
         return _DeactivatedAccount(
           onSignOut: _signOut,
           title: 'Doctor access is not linked',
@@ -77,11 +112,14 @@ class _AuthGateState extends State<AuthGate> {
 
     final data = application.data();
     final status = data?['status'];
+    if (status is! String) {
+      throw StateError('The professional application has an unknown status.');
+    }
     if (status == 'deactivated') {
       return _DeactivatedAccount(onSignOut: _signOut);
     }
 
-    if (status == 'approved' && token.claims?['doctor'] == true) {
+    if (status == 'approved' && hasDoctorClaim) {
       return DoctorDashboardScreen(
         doctorName: _stringOr(data?['fullName'], 'Doctor'),
         specialty: _stringOr(data?['specialty'], 'Healthcare professional'),
@@ -109,8 +147,7 @@ class _AuthGateState extends State<AuthGate> {
       backendManaged: true,
       canSubmitCredentials: isUploadRequired || status == 'rejected',
       hasSubmittedCredentials: hasCredential,
-      accessRefreshRequired:
-          status == 'approved' && token.claims?['doctor'] != true,
+      accessRefreshRequired: status == 'approved' && !hasDoctorClaim,
       onRefreshAccess: () => _refreshAccess(user),
       reviewNote: data != null && data['reviewNotes'] is String
           ? data['reviewNotes'] as String

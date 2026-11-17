@@ -65,6 +65,7 @@ export const {
 export const {
   createDoctorApplication,
   prepareDoctorCredentialResubmission,
+  createDoctorCredentialUpload,
   finalizeDoctorApplication,
   listDoctorApplications,
   getDoctorApplicationCredential,

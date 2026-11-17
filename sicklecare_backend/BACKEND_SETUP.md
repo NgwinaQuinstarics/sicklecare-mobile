@@ -22,10 +22,13 @@ The new `sicklecare_backend` folder contains:
    - Doctor/admin privileges come only from verified Firebase Auth custom
      claims; clients cannot write application status or request elevated roles
 
-   2. **Storage Security** (`storage.rules`)
-   - Owner-scoped file access and file type/size validation
-   - Doctor credentials are private, size-limited, and readable only by admins
-     with the trusted `admin: true` claim
+2. **Credential storage**
+   - Doctor credentials are stored in a private AWS S3 bucket, not Firebase
+     Cloud Storage.
+   - Firebase callable functions authorize short-lived upload and review URLs,
+     verify file size and signatures, and audit administrator access.
+   - Firebase Admin Storage cleanup remains for legacy user files; it is not
+     used for new doctor credentials.
 
 3. **Firestore Indexes** (`firestore.indexes.json`)
    - Optimized queries for health data
@@ -87,9 +90,8 @@ reads of user profile and tracker documents, so sensitive user data must go
 through this audited callable.
 
 The **Doctor review** section lists server-paginated applications. Credential
-downloads are separately authorized by an admin callable and Firebase Storage
-rules, are recorded in the audit log, and are downloaded to the authorized
-administrator's browser rather than exposed through a public download URL.
+access is separately authorized by an admin callable, recorded in the audit
+log, and uses a five-minute, private S3 URL rather than a public download URL.
 Approval assigns the trusted `doctor: true` Auth claim. Rejection retains the
 application and credential history; deactivation disables sign-in, removes the
 doctor claim, revokes refresh tokens, and retains records. Only an administrator
@@ -118,16 +120,54 @@ Cloud Functions deployment requires the Firebase project to use the Blaze
 (pay-as-you-go) plan so Firebase can enable Cloud Build and related APIs.
 Review the expected usage and configure billing alerts before upgrading. The
 dashboard depends on its callable functions; deploying Hosting without those
-functions does not make the dashboard data workflows operational. After
-enabling billing, first review and remediate the production dependency audit:
-`npm audit --omit=dev` currently reports 18 advisories, including one critical
-and ten high severity. Do not apply `npm audit fix --force` without reviewing
-the proposed major-version upgrades and validating the Functions. Then deploy
-the dashboard functions, Firestore rules, and Hosting together from this
-directory:
+functions does not make the dashboard data workflows operational. Review production dependency advisories
+with `npm audit --omit=dev` before launch. The current Functions dependency
+tree has seven moderate uuid advisories in transitive Google/Firebase packages;
+the production audit reports no high or critical advisories. Do not apply
+`npm audit fix --force` without reviewing the proposed major-version upgrades
+and validating the Functions.
+
+Doctor credential storage also requires a private S3 bucket before deploying
+the credential upload/review functions:
+
+1. Enable S3 Block Public Access and default SSE-S3 (AES-256) encryption on the
+   bucket. Do not configure public ACLs or public-read bucket policies.
+2. Create an AWS IAM user whose policy grants only `s3:GetObject` and
+   `s3:PutObject` on `arn:aws:s3:::YOUR_BUCKET/doctor_credentials/*`.
+   Rotate its access keys periodically.
+3. Store the access key pair in Firebase Secret Manager. The CLI prompts for
+   each secret value; never commit or paste the values into source files:
+
+   ```bash
+   firebase functions:secrets:set AWS_ACCESS_KEY_ID --project sicklecare-15d7a
+   firebase functions:secrets:set AWS_SECRET_ACCESS_KEY --project sicklecare-15d7a
+   ```
+
+4. Create `functions/.env.sicklecare-15d7a` with the bucket name and region.
+   This file is ignored by Git:
+
+   ```dotenv
+   AWS_S3_BUCKET=your-private-bucket-name
+   AWS_S3_REGION=eu-west-1
+   ```
+
+Previously submitted credentials in Firebase Storage are not copied
+automatically. Migrate those objects securely to the private S3 bucket and set
+their `credential.storageProvider` to `aws_s3`, or ask those applicants to
+resubmit before enabling the new credential review flow.
+
+The admin overview and account-directory callables can be deployed separately
+to restore dashboard data while AWS is being configured:
 
 ```bash
-firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent,functions:createDoctorApplication,functions:prepareDoctorCredentialResubmission,functions:finalizeDoctorApplication,functions:listDoctorApplications,functions:getDoctorApplicationCredential,functions:reviewDoctorApplication,firestore:rules,firestore:indexes,storage,hosting" --project sicklecare-15d7a
+firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent" --project sicklecare-15d7a
+```
+
+After AWS is configured, deploy the full dashboard and doctor-review workflow,
+Firestore rules, and Hosting together from this directory:
+
+```bash
+firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent,functions:createDoctorApplication,functions:prepareDoctorCredentialResubmission,functions:createDoctorCredentialUpload,functions:finalizeDoctorApplication,functions:listDoctorApplications,functions:getDoctorApplicationCredential,functions:reviewDoctorApplication,firestore:rules,firestore:indexes,hosting" --project sicklecare-15d7a
 ```
 
 No Firebase service has been deployed by the local build/test commands.

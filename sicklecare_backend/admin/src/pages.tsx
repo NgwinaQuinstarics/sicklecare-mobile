@@ -62,6 +62,28 @@ interface PageHeadingProps {
   action?: ReactNode;
 }
 
+function dashboardErrorMessage(error: unknown): string {
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : '';
+  if (code === 'functions/permission-denied') {
+    return 'Admin access was denied. Sign in with an account that has administrator access.';
+  }
+  if (
+    code === 'functions/not-found' ||
+    code === 'functions/unavailable' ||
+    code === 'functions/internal' ||
+    code === 'functions/unknown'
+  ) {
+    return 'The secure dashboard service is unavailable. Check that the backend functions are deployed, then try again.';
+  }
+  return 'Dashboard data could not be loaded. Check your connection and try again.';
+}
+
 function PageHeading({ eyebrow, title, description, action }: PageHeadingProps) {
   return (
     <div className="page-heading">
@@ -206,7 +228,7 @@ export function OverviewView({ onNavigate }: OverviewViewProps) {
         );
       } catch (loadError) {
         console.error('Failed to load dashboard overview:', loadError);
-        if (active) setError('Dashboard data could not be loaded.');
+        if (active) setError(dashboardErrorMessage(loadError));
       } finally {
         if (active) setLoading(false);
       }

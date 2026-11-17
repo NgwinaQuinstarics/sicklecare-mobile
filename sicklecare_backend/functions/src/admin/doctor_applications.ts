@@ -11,9 +11,17 @@ import {
   parseDoctorApplicationUid,
   type DoctorApplicationPayload,
 } from './doctor_application_validation';
+import {
+  createCredentialUploadUrl,
+  createCredentialViewUrl,
+  credentialExists,
+  credentialStorageSecrets,
+  downloadCredential,
+  inspectCredential,
+  isCredentialNotFound,
+} from './credential_storage';
 
 const db = admin.firestore();
-const credentialBucket = admin.storage().bucket();
 const maxCredentialBytes = 10 * 1024 * 1024;
 const allowedCredentialTypes = new Set([
   'application/pdf',
@@ -240,7 +248,66 @@ export const prepareDoctorCredentialResubmission = functions.https.onCall(
   },
 );
 
-export const finalizeDoctorApplication = functions.https.onCall(
+export const createDoctorCredentialUpload = functions
+  .runWith({ secrets: credentialStorageSecrets })
+  .https.onCall(
+    async (data, context) => {
+      const uid = requireApplicantUid(context);
+      await enforceRateLimit(uid, 'createDoctorCredentialUpload', 5);
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Credential upload details are required',
+        );
+      }
+      const input = data as Record<string, unknown>;
+      const contentType = input.contentType;
+      const size = input.size;
+      if (
+        typeof contentType !== 'string' ||
+        !allowedCredentialTypes.has(contentType) ||
+        typeof size !== 'number' ||
+        !Number.isSafeInteger(size) ||
+        size < 1 ||
+        size > maxCredentialBytes
+      ) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Upload a PDF or image no larger than 10 MB',
+        );
+      }
+
+      try {
+        const application = await db.collection('doctor_applications')
+          .doc(uid)
+          .get();
+        const uploadPath = application.data()?.credentialUploadPath;
+        if (
+          !application.exists ||
+          application.data()?.status !== 'upload_required' ||
+          typeof uploadPath !== 'string' ||
+          !uploadPath.startsWith(`doctor_credentials/${uid}/`)
+        ) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Start or update your application before uploading credentials',
+          );
+        }
+        return await createCredentialUploadUrl(uploadPath, contentType, size);
+      } catch (error) {
+        if (error instanceof functions.https.HttpsError) throw error;
+        console.error('Unable to authorize credential upload:', error);
+        throw new functions.https.HttpsError(
+          'internal',
+          'Credential upload is temporarily unavailable',
+        );
+      }
+    },
+  );
+
+export const finalizeDoctorApplication = functions
+  .runWith({ secrets: credentialStorageSecrets })
+  .https.onCall(
   async (data, context) => {
     const uid = requireApplicantUid(context);
     await enforceRateLimit(uid, 'finalizeDoctorApplication', 5);
@@ -287,11 +354,12 @@ export const finalizeDoctorApplication = functions.https.onCall(
         );
       }
 
-      const file = credentialBucket.file(application.credentialUploadPath);
-      const [metadata] = await file.getMetadata();
-      const size = Number(metadata.size);
+      const metadata = await inspectCredential(application.credentialUploadPath);
+      const size = metadata.size;
+      const contentType = metadata.contentType;
       if (
-        !allowedCredentialTypes.has(metadata.contentType ?? '') ||
+        !allowedCredentialTypes.has(contentType ?? '') ||
+        typeof size !== 'number' ||
         !Number.isSafeInteger(size) ||
         size < 1 ||
         size > maxCredentialBytes
@@ -301,8 +369,8 @@ export const finalizeDoctorApplication = functions.https.onCall(
           'Upload a PDF or image no larger than 10 MB',
         );
       }
-      const [contents] = await file.download();
-      if (!matchesCredentialSignature(contents, metadata.contentType ?? '')) {
+      const contents = await downloadCredential(application.credentialUploadPath);
+      if (!matchesCredentialSignature(contents, contentType ?? '')) {
         throw new functions.https.HttpsError(
           'invalid-argument',
           'The uploaded file does not match its declared document type',
@@ -323,10 +391,11 @@ export const finalizeDoctorApplication = functions.https.onCall(
           credentialUploadPath: FieldValue.delete(),
           credential: {
             path: application.credentialUploadPath,
+            storageProvider: 'aws_s3',
             type: credentialType.trim(),
             issuer: issuer.trim(),
             referenceNumber: referenceNumber.trim(),
-            contentType: metadata.contentType,
+            contentType,
             size,
             submittedAt: FieldValue.serverTimestamp(),
           },
@@ -346,12 +415,7 @@ export const finalizeDoctorApplication = functions.https.onCall(
       return { status: 'pending' };
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 404
-      ) {
+      if (isCredentialNotFound(error)) {
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Upload the credential file before submitting',
@@ -364,7 +428,7 @@ export const finalizeDoctorApplication = functions.https.onCall(
       );
     }
   },
-);
+  );
 
 export const listDoctorApplications = functions.https.onCall(
   async (data, context) => {
@@ -420,7 +484,9 @@ export const listDoctorApplications = functions.https.onCall(
   },
 );
 
-export const getDoctorApplicationCredential = functions.https.onCall(
+export const getDoctorApplicationCredential = functions
+  .runWith({ secrets: credentialStorageSecrets })
+  .https.onCall(
   async (data, context) => {
     const actorUid = requireAdminUid(
       context.auth?.uid,
@@ -441,13 +507,21 @@ export const getDoctorApplicationCredential = functions.https.onCall(
       if (
         !snapshot.exists ||
         typeof credentialPath !== 'string' ||
-        !credentialPath.startsWith(`doctor_credentials/${uid}/`)
+        !credentialPath.startsWith(`doctor_credentials/${uid}/`) ||
+        snapshot.data()?.credential?.storageProvider !== 'aws_s3'
       ) {
         throw new functions.https.HttpsError(
           'not-found',
           'No credential is available for this application',
         );
       }
+      if (!(await credentialExists(credentialPath))) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          'The credential is no longer available',
+        );
+      }
+      const url = await createCredentialViewUrl(credentialPath);
       await db.collection('admin_audit_logs').add({
         actorUid,
         action: 'doctor.credential.viewed',
@@ -456,7 +530,7 @@ export const getDoctorApplicationCredential = functions.https.onCall(
         createdAt: FieldValue.serverTimestamp(),
       });
       return {
-        path: credentialPath,
+        url,
         contentType: snapshot.data()?.credential?.contentType ?? 'application/pdf',
       };
     } catch (error) {
@@ -468,9 +542,11 @@ export const getDoctorApplicationCredential = functions.https.onCall(
       );
     }
   },
-);
+  );
 
-export const reviewDoctorApplication = functions.https.onCall(
+export const reviewDoctorApplication = functions
+  .runWith({ secrets: credentialStorageSecrets })
+  .https.onCall(
   async (data, context) => {
     const actorUid = requireAdminUid(
       context.auth?.uid,
@@ -556,16 +632,15 @@ export const reviewDoctorApplication = functions.https.onCall(
           const credentialPath = applicationSnapshot.data()?.credential?.path;
           if (
             typeof credentialPath !== 'string' ||
-            !credentialPath.startsWith(`doctor_credentials/${request.uid}/`)
+            !credentialPath.startsWith(`doctor_credentials/${request.uid}/`) ||
+            applicationSnapshot.data()?.credential?.storageProvider !== 'aws_s3'
           ) {
             throw new functions.https.HttpsError(
               'failed-precondition',
               'The approved credential is unavailable; the account cannot be reactivated',
             );
           }
-          const [credentialExists] =
-            await credentialBucket.file(credentialPath).exists();
-          if (!credentialExists) {
+          if (!(await credentialExists(credentialPath))) {
             throw new functions.https.HttpsError(
               'failed-precondition',
               'The approved credential is unavailable; the account cannot be reactivated',
@@ -622,16 +697,15 @@ export const reviewDoctorApplication = functions.https.onCall(
         const credentialPath = applicationSnapshot.data()?.credential?.path;
         if (
           typeof credentialPath !== 'string' ||
-          !credentialPath.startsWith(`doctor_credentials/${request.uid}/`)
+          !credentialPath.startsWith(`doctor_credentials/${request.uid}/`) ||
+          applicationSnapshot.data()?.credential?.storageProvider !== 'aws_s3'
         ) {
           throw new functions.https.HttpsError(
             'failed-precondition',
             'A submitted credential is required before approval',
           );
         }
-        const [credentialExists] =
-          await credentialBucket.file(credentialPath).exists();
-        if (!credentialExists) {
+        if (!(await credentialExists(credentialPath))) {
           throw new functions.https.HttpsError(
             'failed-precondition',
             'The submitted credential is no longer available',
@@ -720,11 +794,12 @@ export const reviewDoctorApplication = functions.https.onCall(
       );
     }
   },
-);
+  );
 
 export const doctorApplicationFunctions = {
   createDoctorApplication,
   prepareDoctorCredentialResubmission,
+  createDoctorCredentialUpload,
   finalizeDoctorApplication,
   listDoctorApplications,
   getDoctorApplicationCredential,

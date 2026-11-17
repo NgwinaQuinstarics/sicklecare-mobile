@@ -8,9 +8,8 @@ import {
   X,
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
-import { getBlob, ref } from 'firebase/storage';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { functions, storage } from './firebase';
+import { useCallback, useEffect, useState } from 'react';
+import { functions } from './firebase';
 import './doctor-applications.css';
 
 type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'deactivated';
@@ -41,7 +40,7 @@ interface ListResult {
 }
 
 interface CredentialResult {
-  path: string;
+  url: string;
   contentType: string;
 }
 
@@ -83,13 +82,7 @@ export function DoctorApplicationsView({
   const [credentialFiles, setCredentialFiles] =
     useState<Record<string, CredentialFile>>({});
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
-  const credentialUrlSet = useRef(new Set<string>());
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => () => {
-    for (const url of credentialUrlSet.current) URL.revokeObjectURL(url);
-    credentialUrlSet.current.clear();
-  }, []);
 
   const loadApplications = useCallback(async (pageToken?: string) => {
     setLoading(true);
@@ -131,9 +124,6 @@ export function DoctorApplicationsView({
         'getDoctorApplicationCredential',
       );
       const { data } = await getCredential({ uid: application.uid });
-      const blob = await getBlob(ref(storage, data.path), 10 * 1024 * 1024);
-      const url = URL.createObjectURL(blob);
-      credentialUrlSet.current.add(url);
       const extension = {
         'application/pdf': 'pdf',
         'image/jpeg': 'jpg',
@@ -142,7 +132,7 @@ export function DoctorApplicationsView({
       }[data.contentType] ?? 'bin';
       setCredentialFiles((previous) => ({
         ...previous,
-        [application.uid]: { url, extension },
+        [application.uid]: { url: data.url, extension },
       }));
     } catch (credentialError) {
       console.error('Unable to securely open doctor credential:', credentialError);
@@ -301,10 +291,9 @@ export function DoctorApplicationsView({
                     credentialFile ? (
                       <a
                         className="button button-secondary"
-                        download={`doctor-credential-${application.uid}.${credentialFile.extension}`}
                         href={credentialFile.url}
                       >
-                        <FileText size={15} /> Download credential
+                        <FileText size={15} /> Download credential ({credentialFile.extension.toUpperCase()})
                       </a>
                     ) : (
                       <button

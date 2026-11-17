@@ -3,23 +3,20 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
 
 class DoctorApplicationService {
   DoctorApplicationService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-    FirebaseStorage? storage,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance,
-        _storage = storage ?? FirebaseStorage.instance;
+        _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
-  final FirebaseStorage _storage;
 
   Future<void> createApplication(Map<String, Object?> details) async {
     final user = _auth.currentUser;
@@ -79,10 +76,35 @@ class DoctorApplicationService {
       _ => throw ArgumentError('Choose a PDF, JPEG, PNG, or WebP file.'),
     };
 
-    await _storage.ref(uploadPath).putData(
-          bytes,
-          SettableMetadata(contentType: contentType),
-        );
+    final upload = await _functions
+        .httpsCallable('createDoctorCredentialUpload')
+        .call<Map<String, dynamic>>({
+      'contentType': contentType,
+      'size': bytes.length,
+    });
+    final uploadUrl = upload.data['url'];
+    final uploadHeaders = upload.data['headers'];
+    if (uploadUrl is! String || uploadHeaders is! Map) {
+      throw StateError('The secure credential upload could not be prepared.');
+    }
+    final headers = <String, String>{};
+    for (final entry in uploadHeaders.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (key is String && value is String) {
+        headers[key] = value;
+      }
+    }
+    final response = await http.put(
+      Uri.parse(uploadUrl),
+      headers: headers,
+      body: bytes,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'The secure credential upload failed (${response.statusCode}).',
+      );
+    }
     await _functions.httpsCallable('finalizeDoctorApplication').call({
       'credentialType': credentialType,
       'issuer': issuer,
