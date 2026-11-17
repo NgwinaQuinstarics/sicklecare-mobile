@@ -162,7 +162,7 @@ export function SignIn({ accessError }: SignInProps) {
             {error && <div className="form-error" role="alert">{error}</div>}
             {notice && <div className="form-notice" role="status">{notice}</div>}
             <button className="button button-primary signin-submit" disabled={busy}>
-              {busy ? 'Please wait…' : 'Sign in securely'}
+              {busy ? 'Please wait…' : 'Sign in as administrator'}
               {!busy && <ArrowRight size={17} />}
             </button>
           </form>
