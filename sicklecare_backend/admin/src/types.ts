@@ -1,6 +1,12 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type Section = 'overview' | 'users' | 'inbox' | 'content' | 'activity';
+export type Section =
+  | 'overview'
+  | 'users'
+  | 'doctors'
+  | 'inbox'
+  | 'content'
+  | 'activity';
 
 export interface DashboardSummary {
   userCount: number;

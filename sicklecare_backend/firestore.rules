@@ -21,7 +21,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'uid', 'email', 'name', 'displayName', 'photoURL', 'role',
           'createdAt', 'updatedAt', 'settings', 'healthStats',
-          'genotype', 'phone', 'requestedAccountType'
+          'genotype', 'phone'
         ])
         && (!('uid' in request.resource.data)
           || request.resource.data.uid == userId)
@@ -32,8 +32,6 @@ service cloud.firestore {
         && (!('name' in request.resource.data)
           || (request.resource.data.name is string
             && request.resource.data.name.size() <= 120))
-        && (!('requestedAccountType' in request.resource.data)
-          || request.resource.data.requestedAccountType in ['patient', 'doctor'])
         && (!('genotype' in request.resource.data)
           || (request.resource.data.genotype is string
             && request.resource.data.genotype.size() <= 40))
@@ -45,7 +43,7 @@ service cloud.firestore {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
       return changed.hasOnly([
           'name', 'displayName', 'photoURL', 'settings', 'genotype',
-          'phone', 'updatedAt', 'requestedAccountType'
+          'phone', 'updatedAt', 'avatarUrl', 'profileImageUrl'
         ])
         && (!('name' in request.resource.data)
           || (request.resource.data.name is string
@@ -64,10 +62,12 @@ service cloud.firestore {
         && (!('phone' in request.resource.data)
           || (request.resource.data.phone is string
             && request.resource.data.phone.size() <= 40))
-        && (!request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['requestedAccountType'])
-          || (!('requestedAccountType' in resource.data)
-            && request.resource.data.requestedAccountType in ['patient', 'doctor']))
+        && (!('avatarUrl' in request.resource.data)
+          || (request.resource.data.avatarUrl is string
+            && request.resource.data.avatarUrl.size() <= 2048))
+        && (!('profileImageUrl' in request.resource.data)
+          || (request.resource.data.profileImageUrl is string
+            && request.resource.data.profileImageUrl.size() <= 2048))
         && (!('updatedAt' in request.resource.data)
           || request.resource.data.updatedAt is timestamp);
     }
@@ -239,6 +239,15 @@ service cloud.firestore {
       match /{document=**} {
         allow read, write: if false;
       }
+    }
+
+    match /doctor_applications/{userId} {
+      allow get: if isOwner(userId);
+      allow list, create, update, delete: if false;
+    }
+
+    match /doctor_application_events/{eventId} {
+      allow read, write: if false;
     }
 
     match /support/{ticketId} {

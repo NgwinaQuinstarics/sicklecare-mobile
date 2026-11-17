@@ -29,6 +29,7 @@ import {
   OverviewView,
   UsersView,
 } from './pages';
+import { DoctorApplicationsView } from './DoctorApplicationsView';
 import type { Section } from './types';
 import { SignIn } from './SignIn';
 
@@ -39,6 +40,7 @@ const navigation: Array<{
 }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'users', label: 'User directory', icon: Users },
+  { id: 'doctors', label: 'Doctor review', icon: ShieldCheck },
   { id: 'inbox', label: 'Support inbox', icon: Inbox },
   { id: 'content', label: 'Home content', icon: BookOpenText },
   { id: 'activity', label: 'Activity log', icon: Clock3 },
@@ -277,6 +279,7 @@ export function App() {
         <div className="page-content">
           {section === 'overview' && <OverviewView onNavigate={setSection} />}
           {section === 'users' && <UsersView />}
+          {section === 'doctors' && <DoctorApplicationsView onNotify={showToast} />}
           {section === 'inbox' && <InboxView onNotify={showToast} />}
           {section === 'content' && <ContentView onNotify={showToast} />}
           {section === 'activity' && <ActivityView />}

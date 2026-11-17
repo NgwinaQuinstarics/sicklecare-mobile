@@ -1,0 +1,30 @@
+.doctor-filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.doctor-filter { padding: 8px 12px; color: #647087; border: 1px solid #e4e9f1; border-radius: 20px; background: #fff; font: inherit; font-size: 11px; cursor: pointer; }
+.doctor-filter-active { color: #fff; border-color: #224d80; background: #224d80; }
+.doctor-application-list { display: grid; gap: 14px; }
+.doctor-application-card { padding: 18px; }
+.doctor-application-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.doctor-application-heading h2 { margin: 2px 0 5px; color: #26334b; font-size: 18px; }
+.doctor-application-heading > div > span { color: #78849a; font-size: 11px; }
+.doctor-status { flex: 0 0 auto; padding: 5px 9px; border-radius: 20px; background: #f0f3f8; color: #627087; font-size: 10px; font-weight: 700; }
+.doctor-status-pending { color: #8a6413; background: #fff5dc; }
+.doctor-status-approved { color: #22734e; background: #e7f6ed; }
+.doctor-status-rejected, .doctor-status-deactivated { color: #a64c55; background: #fff0f0; }
+.doctor-status-upload_required { color: #79559b; background: #f4edfb; }
+.doctor-application-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px 18px; margin: 18px 0 0; }
+.doctor-application-details div { min-width: 0; }
+.doctor-application-details dt { margin-bottom: 4px; color: #929bae; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.doctor-application-details dd { margin: 0; color: #46536a; font-size: 11px; overflow-wrap: anywhere; }
+.doctor-application-bio { margin: 14px 0 0; color: #66738a; font-size: 11px; line-height: 1.5; }
+.doctor-review-note { padding: 10px 12px; color: #775e2b; border-radius: 8px; background: #fff8e9; font-size: 10px; line-height: 1.5; }
+.doctor-application-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef0f4; }
+.doctor-review-input { flex: 1 1 180px; min-width: 160px; height: 34px; padding: 0 10px; border: 1px solid #e1e6ee; border-radius: 7px; color: #46536a; font: inherit; font-size: 10px; }
+.button-danger { color: #a64c55; border-color: #efcaca; }
+.doctor-empty { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #8c96a8; font-size: 11px; }
+.doctor-empty strong { color: #45536b; font-size: 13px; }
+.doctor-load-more { display: flex; justify-content: center; margin: 16px 0; }
+@media (max-width: 700px) {
+  .doctor-application-card { padding: 14px; }
+  .doctor-application-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .doctor-application-heading h2 { font-size: 16px; }
+}

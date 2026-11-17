@@ -13,6 +13,7 @@ import { reportFunctions } from './reports';
 import { utilityFunctions } from './utils';
 import { askSika } from './ai';
 import { adminFunctions } from './admin';
+import { doctorApplicationFunctions } from './admin/doctor_applications';
 
 // Export all functions
 export const {
@@ -60,6 +61,15 @@ export const {
   getAdminUserDetails,
   listAdminAuditLogs,
 } = adminFunctions;
+
+export const {
+  createDoctorApplication,
+  prepareDoctorCredentialResubmission,
+  finalizeDoctorApplication,
+  listDoctorApplications,
+  getDoctorApplicationCredential,
+  reviewDoctorApplication,
+} = doctorApplicationFunctions;
 
 // HTTP endpoints for webhooks and external integrations
 export const api = functions.https.onRequest(async (req, res) => {

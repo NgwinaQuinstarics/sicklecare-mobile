@@ -5,7 +5,7 @@ This is the Firebase-based backend for the SickleCare health management applicat
 
 ## ✅ What's Already Done
 
-Your Flutter app (`sicklecare_frontend`) already has:
+The Flutter app in `sicklecare_app/` uses:
 - ✅ Firebase Authentication
 - ✅ Cloud Firestore database
 - ✅ Basic data structure
@@ -19,13 +19,13 @@ The new `sicklecare_backend` folder contains:
    - Owner-scoped health data and validated writes
    - Admin/support access based on trusted Firebase custom claims
    - Profile fields cannot grant or change privileged roles
-   - The signup-selected `requestedAccountType` is self-reported metadata only;
-     doctor selection does not grant privileges or patient-data access
+   - Doctor/admin privileges come only from verified Firebase Auth custom
+     claims; clients cannot write application status or request elevated roles
 
    2. **Storage Security** (`storage.rules`)
-   - Secure file upload/download
-   - File type and size validation
-   - User-specific storage buckets
+   - Owner-scoped file access and file type/size validation
+   - Doctor credentials are private, size-limited, and readable only by admins
+     with the trusted `admin: true` claim
 
 3. **Firestore Indexes** (`firestore.indexes.json`)
    - Optimized queries for health data
@@ -36,6 +36,9 @@ The new `sicklecare_backend` folder contains:
    - User-data cleanup when an Auth account is deleted
    - Analytics and JSON/CSV exports for the Flutter tracker schema
    - JSON health reports stored in each user's reports subcollection
+   - Validated doctor applications, private credential uploads, and
+     administrator-only review, approval, rejection, and reversible
+     deactivation/reactivation
 
 ## 📋 Prerequisites
 
@@ -81,6 +84,15 @@ device are not available to the dashboard. Firestore client rules deny admin
 reads of user profile and tracker documents, so sensitive user data must go
 through this audited callable.
 
+The **Doctor review** section lists server-paginated applications. Credential
+downloads are separately authorized by an admin callable and Firebase Storage
+rules, are recorded in the audit log, and are downloaded to the authorized
+administrator's browser rather than exposed through a public download URL.
+Approval assigns the trusted `doctor: true` Auth claim. Rejection retains the
+application and credential history; deactivation disables sign-in, removes the
+doctor claim, revokes refresh tokens, and retains records. Only an administrator
+can reactivate a deactivated account.
+
 Run the console locally:
 
 ```bash
@@ -113,7 +125,7 @@ the dashboard functions, Firestore rules, and Hosting together from this
 directory:
 
 ```bash
-firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent,firestore:rules,hosting" --project sicklecare-15d7a
+firebase deploy --only "functions:getAdminDashboardSummary,functions:listAdminUsers,functions:getAdminUserDetails,functions:listAdminAuditLogs,functions:updateAdminInboxStatus,functions:updateAdminHomeContent,functions:createDoctorApplication,functions:prepareDoctorCredentialResubmission,functions:finalizeDoctorApplication,functions:listDoctorApplications,functions:getDoctorApplicationCredential,functions:reviewDoctorApplication,firestore:rules,firestore:indexes,storage,hosting" --project sicklecare-15d7a
 ```
 
 No Firebase service has been deployed by the local build/test commands.

@@ -1,130 +1,74 @@
 # SickleCare
 
-SickleCare is a Flutter app for offline-first health tracking, reminders, and
-support for people affected by sickle cell disease. Firebase Authentication
-and Firestore are used for account and cloud features; health tracking and
-reminders continue to work locally.
+SickleCare is a Flutter health-management app with a Firebase backend and a
+claim-protected web administration console.
 
 ## Repository layout
 
-- `sicklecare_frontend/` — Flutter application and platform projects.
-- `sicklecare_backend/` — Firebase Functions, Firestore and Storage rules,
-  indexes, hosted admin dashboard, and backend setup.
-- `BACKEND_AUDIT_REPORT.md` — current findings, verification, and remaining
-  operational work.
-- `FRONTEND_BACKEND_INTEGRATION.md` — app/backend data and callable contracts.
+- `sicklecare_app/` — active Flutter app and Android/iOS projects.
+- `sicklecare_backend/` — canonical Firebase Functions, Firestore and Storage
+  rules, indexes, and hosted admin console.
 
-## Run the Flutter app
+The retired `sicklecare_frontend/` project is not used. Firebase deployments
+should be run from `sicklecare_backend/`, which owns the Firestore and Storage
+rules and indexes. The app's Firebase config contains only FlutterFire platform
+configuration.
 
-Requirements: Flutter and Dart versions allowed by
-[`pubspec.yaml`](./sicklecare_frontend/pubspec.yaml), Android SDK, and Java 17.
+## Run and build the app
 
-```bash
-cd sicklecare_frontend
+Install Flutter and the Android SDK, then run these commands from PowerShell:
+
+```powershell
+Set-Location .\sicklecare_app
 flutter pub get
-flutter run
+flutter analyze
+flutter test
+flutter build apk --release
 ```
 
-Firebase Android configuration (`android/app/google-services.json`) is local
-and ignored by Git. Configure the app with the approved Firebase project before
-testing cloud features. Do not commit Firebase service-account keys, local
-configuration, provider secrets, or signing keys.
+The release APK is written to
+`sicklecare_app/build/app/outputs/flutter-apk/app-release.apk`. Android's
+`google-services.json` is local and Git-ignored; install the approved
+SickleCare Firebase Android configuration at
+`sicklecare_app/android/app/google-services.json` before running Firebase
+features or building. Do not commit Firebase service-account keys, signing
+keys, or other private credentials. Release builds currently use the Android
+debug signing configuration and are for testing/sideloading only.
 
-## Backend development
+## Backend and admin console
 
-Cloud Functions, Firestore rules, Storage rules, and indexes are configured
-under `sicklecare_backend/`. That folder's `.firebaserc` default project matches
-the Flutter app's Firebase project configuration.
+The doctor onboarding flow creates an Auth account, submits a validated
+application, and uploads a bounded PDF/image to private Firebase Storage.
+Only admins with the trusted `admin: true` custom claim can review credentials
+or approve/reject applications. Approval assigns `doctor: true`; rejection
+retains the record for resubmission. Deactivation disables sign-in, revokes
+refresh tokens, removes doctor access, and preserves the application and audit
+history; admins can reactivate an account.
 
-```bash
-cd sicklecare_backend/functions
+Run the backend tests from `sicklecare_backend/functions`:
+
+```powershell
 npm ci
 npm run build
 npm run lint
 npm test -- --runInBand
 ```
 
-The backend's `askSika` callable requires an authorized Secret Manager value for
-`GROQ_API_KEY`. Provision it interactively with the Firebase CLI from
-`sicklecare_backend/`; never place the key in Flutter or source control. The app
-uses its local fallback if the online callable is unavailable.
+Run the admin console locally from `sicklecare_backend/admin` with `npm ci` and
+`npm run dev`. Its authenticated credential downloads are authorized by
+callable functions and Storage rules; they do not use public download URLs.
 
-The web administration console is in `sicklecare_backend/admin`. Its secure
-sign-in requires a trusted Firebase Auth `admin` custom claim. It includes a
-dashboard summary, paginated account directory, live support inbox, and
-home-content editor. Inbox/content changes use admin-only backend callables
-and produce audit metadata. Individual user details and synced health tracker
-records are available on demand through an audited, read-only backend callable.
-The dashboard cannot fetch records that remain only on a user's device.
-Run it locally with `npm ci` and `npm run dev` from that folder. Deploy Hosting
-only after reviewing the target Firebase project, authorized domains, and
-security headers:
+Cloud Functions deployment requires an eligible Firebase billing plan and
+Cloud Build access. Review `sicklecare_backend/BACKEND_SETUP.md` for targeted
+deployment steps. Local build and test commands do not deploy production
+services. Never grant admin or doctor access by editing a Firestore profile
+role; use trusted server-side custom claims.
 
-```bash
-cd sicklecare_backend
-firebase deploy --only hosting
-```
+## Feature boundaries
 
-For emulator-only dashboard testing, copy
-[`sicklecare_backend/admin/.env.example`](./sicklecare_backend/admin/.env.example)
-to `.env.local` and start the backend Auth, Firestore, and Functions emulators.
-
-Deployments are **not** performed by these local build/test commands. Before
-deploying, review Firebase project selection, App Check configuration, billing,
-indexes, and security rules. Only trusted operators should grant custom Auth
-claims; a Firestore profile role is not authorization.
-Cloud Functions deployment requires the Firebase project to use the Blaze
-(pay-as-you-go) plan. Review usage and configure billing alerts, then follow the
-targeted deployment command in
-[`sicklecare_backend/BACKEND_SETUP.md`](./sicklecare_backend/BACKEND_SETUP.md)
-to publish the admin callables, Firestore rules, and Hosting app together.
-
-## Verification
-
-From the repository root in PowerShell, build a release APK with:
-
-```powershell
-.\build-apk.ps1
-```
-
-For smaller APKs split by Android architecture:
-
-```powershell
-.\build-apk.ps1 -SplitPerAbi
-```
-
-The script builds from `sicklecare_frontend/` and requires the local,
-git-ignored `sicklecare_frontend/android/app/google-services.json` Firebase
-configuration. The default release APK is written to
-`sicklecare_frontend/build/app/outputs/flutter-apk/app-release.apk`.
-
-Alternatively, run Flutter commands directly after changing to the Flutter
-project directory:
-
-```bash
-cd sicklecare_frontend
-flutter analyze
-flutter test
-flutter build apk --release
-```
-
-APK outputs are ignored by Git. Release builds currently use the Android
-debug signing configuration and are for testing/sideloading only. Play Store
-distribution requires a separately managed Android signing key.
-
-## Current feature boundaries
-
-- Sika online chat is opt-in and sends bounded chat text/history to the
-  authenticated backend callable; tracker, profile, and reminder data are not
-  attached.
-- Tracker entries use
-  `users/{uid}/tracker_entries/{entryId}`. Older records under `health/` are
-  not automatically migrated.
-- Reminders are device-local. Cloud FCM delivery is not integrated in the
-  Flutter app.
-- The repository includes both an in-app Flutter admin screen and the
-  Firebase Hosting web admin console. Both use the trusted admin claim;
-  dashboard writes go through the audited admin callables.
-- Weekly report generation stores JSON reports. Email delivery and recoverable
-  user backups require additional services and are not represented as working
-  features.
+- Health tracking and reminders include device-local/offline behavior; not all
+  app data is synchronized to Firebase.
+- Doctor registration, credential review, approval, and deactivation are
+  connected to the backend. Appointment and availability management are not
+  connected yet.
+- APK artifacts and local Firebase configuration are ignored by Git.

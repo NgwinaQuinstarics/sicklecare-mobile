@@ -26,6 +26,15 @@ service firebase.storage {
       return request.resource.size <= maxBytes;
     }
 
+    function canUploadDoctorCredential(userId, fileName) {
+      let application = firestore.get(
+        /databases/(default)/documents/doctor_applications/$(userId)
+      ).data;
+      return application.status == 'upload_required'
+        && application.credentialUploadPath
+          == 'doctor_credentials/' + userId + '/' + fileName;
+    }
+
     match /users/{userId}/profile/{fileName} {
       allow read: if isOwner(userId) || isAdmin();
       allow create, update:
@@ -81,6 +90,18 @@ service firebase.storage {
           && isWithinSizeLimit(10 * 1024 * 1024);
       allow delete: if isAdmin()
         || (isSignedIn() && request.auth.token.support == true);
+    }
+
+    match /doctor_credentials/{userId}/{fileName} {
+      allow read: if isAdmin();
+      allow create, update: if isOwner(userId)
+        && request.resource.contentType.matches(
+          'application/pdf|image/(jpeg|png|webp)'
+        )
+        && request.resource.size > 0
+        && isWithinSizeLimit(10 * 1024 * 1024)
+        && canUploadDoctorCredential(userId, fileName);
+      allow delete: if false;
     }
   }
 }
