@@ -81,16 +81,35 @@ to publish the admin callables, Firestore rules, and Hosting app together.
 
 ## Verification
 
+From the repository root in PowerShell, build a release APK with:
+
+```powershell
+.\build-apk.ps1
+```
+
+For smaller APKs split by Android architecture:
+
+```powershell
+.\build-apk.ps1 -SplitPerAbi
+```
+
+The script builds from `sicklecare_frontend/` and requires the local,
+git-ignored `sicklecare_frontend/android/app/google-services.json` Firebase
+configuration. The default release APK is written to
+`sicklecare_frontend/build/app/outputs/flutter-apk/app-release.apk`.
+
+Alternatively, run Flutter commands directly after changing to the Flutter
+project directory:
+
 ```bash
 cd sicklecare_frontend
 flutter analyze
 flutter test
-flutter build apk --debug
+flutter build apk --release
 ```
 
-The debug APK is written to
-`sicklecare_frontend/build/app/outputs/flutter-apk/app-debug.apk` and is
-ignored by Git. It is for testing, not Play Store distribution. Release
+APK outputs are ignored by Git. Release builds currently use the Android
+debug signing configuration and are for testing/sideloading only. Play Store
 distribution requires a separately managed Android signing key.
 
 ## Current feature boundaries
