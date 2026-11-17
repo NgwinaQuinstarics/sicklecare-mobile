@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 duration: const Duration(milliseconds: 420),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
-                  child: Image.asset('assets/logo.png',
+                  child: Image.asset('assets/appicon.jpeg',
                       width: 116,
                       height: 116,
                       cacheWidth: 320,

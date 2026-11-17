@@ -14,7 +14,7 @@ import '../services/alarm_service.dart';
 
 const _kChatKey = 'sika_chat';
 final ImageProvider _kSikaLogo =
-    ResizeImage(const AssetImage('assets/logo.png'), width: 200);
+    ResizeImage(const AssetImage('assets/appicon.jpeg'), width: 200);
 
 class AIChatScreen extends StatefulWidget {
   const AIChatScreen({super.key});

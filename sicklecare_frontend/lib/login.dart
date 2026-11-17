@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Image.asset('assets/logo.png',
+                        child: Image.asset('assets/appicon.jpeg',
                             width: 84,
                             height: 84,
                             cacheWidth: 240,

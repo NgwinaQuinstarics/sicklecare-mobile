@@ -188,7 +188,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
-                        child: Image.asset('assets/logo.png',
+                        child: Image.asset('assets/appicon.jpeg',
                             width: 68,
                             height: 68,
                             cacheWidth: 200,
