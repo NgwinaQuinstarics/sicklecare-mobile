@@ -45,6 +45,13 @@ retains the record for resubmission. Deactivation disables sign-in, revokes
 refresh tokens, removes doctor access, and preserves the application and audit
 history; admins can reactivate an account.
 
+The admin overview reads registered account profiles, doctor application
+statuses, and recent submissions from Firebase. The user directory shows
+account/profile details and paginated tracker entries that have synced to
+Firestore; records kept only on a device are not visible to admins. User
+profile and health-record access is restricted to admin-claim protected
+functions, with health-record views audited.
+
 Run the backend tests from `sicklecare_backend/functions`:
 
 ```powershell

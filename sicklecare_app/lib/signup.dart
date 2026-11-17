@@ -25,6 +25,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _loading = false;
   bool _obscure = true;
   bool _acceptTerms = false;
+  bool _profileSavePending = false;
   String? _error;
   late final TapGestureRecognizer _termsTap;
   late final TapGestureRecognizer _privacyTap;
@@ -81,31 +82,39 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
     try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _pass.text,
-      );
+      final email = _email.text.trim();
+      final auth = FirebaseAuth.instance;
+      final signedInUser = auth.currentUser;
+      final user = signedInUser != null &&
+              signedInUser.email?.toLowerCase() == email.toLowerCase()
+          ? signedInUser
+          : (await auth.createUserWithEmailAndPassword(
+              email: email,
+              password: _pass.text,
+            ))
+              .user!;
       try {
-        await cred.user?.updateDisplayName(_name.text.trim());
+        await user.updateDisplayName(_name.text.trim());
       } catch (e) {
         debugPrint('updateDisplayName failed (known Pigeon bug): $e');
       }
-      // Firestore profile creation — non-fatal if rules block it.
-      // The profile will be created/merged on next login via AuthProvider.
       try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(cred.user!.uid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'name': _name.text.trim(),
-          'email': _email.text.trim(),
+          'email': email,
           'genotype': _genotype.text.trim(),
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
       } catch (firestoreErr) {
-        debugPrint('Firestore profile write failed (non-fatal): $firestoreErr');
+        debugPrint('Firestore profile write failed: $firestoreErr');
+        if (!mounted) return;
+        setState(() {
+          _profileSavePending = true;
+          _error =
+              'Your account was created, but your profile details could not be saved. Check your connection and retry.';
+        });
+        return;
       }
+      _profileSavePending = false;
       _finishSignup();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -389,7 +398,11 @@ class _SignupScreenState extends State<SignupScreen> {
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(l.createAccount),
+                          : Text(
+                              _profileSavePending
+                                  ? l.tr('Retry profile save', 'Réessayer')
+                                  : l.createAccount,
+                            ),
                     ),
                     const SizedBox(height: 10),
                     Center(

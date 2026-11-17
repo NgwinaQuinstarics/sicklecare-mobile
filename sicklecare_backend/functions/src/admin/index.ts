@@ -43,7 +43,9 @@ export const getAdminDashboardSummary = functions.https.onCall(
       const recentCutoff = Timestamp.fromDate(
         new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
       );
-      const [users, newUsers, openSupport, openContacts] = await Promise.all([
+      const [users, newUsers, openSupport, openContacts, pendingDoctors,
+        doctorsNeedingCredentials, approvedDoctors, recentUsers,
+        recentDoctorApplications] = await Promise.all([
         db.collection('users').count().get(),
         db.collection('users')
           .where('createdAt', '>=', recentCutoff)
@@ -57,6 +59,27 @@ export const getAdminDashboardSummary = functions.https.onCall(
           .where('status', 'in', openStatuses)
           .count()
           .get(),
+        db.collection('doctor_applications')
+          .where('status', '==', 'pending')
+          .count()
+          .get(),
+        db.collection('doctor_applications')
+          .where('status', '==', 'upload_required')
+          .count()
+          .get(),
+        db.collection('doctor_applications')
+          .where('status', '==', 'approved')
+          .count()
+          .get(),
+        db.collection('users')
+          .orderBy('createdAt', 'desc')
+          .limit(5)
+          .get(),
+        db.collection('doctor_applications')
+          .where('status', '==', 'pending')
+          .orderBy('updatedAt', 'desc')
+          .limit(5)
+          .get(),
       ]);
 
       return {
@@ -64,6 +87,39 @@ export const getAdminDashboardSummary = functions.https.onCall(
         newUsersLast7Days: newUsers.data().count,
         openSupportCount: openSupport.data().count,
         openContactCount: openContacts.data().count,
+        pendingDoctorCount: pendingDoctors.data().count,
+        doctorsNeedingCredentialsCount: doctorsNeedingCredentials.data().count,
+        approvedDoctorCount: approvedDoctors.data().count,
+        recentUsers: recentUsers.docs.map((snapshot) => {
+          const record = snapshot.data();
+          return {
+            uid: snapshot.id,
+            name: typeof record.name === 'string' ? record.name : '',
+            email: typeof record.email === 'string' ? record.email : '',
+            requestedAccountType:
+              record.requestedAccountType === 'patient' ||
+              record.requestedAccountType === 'doctor' ?
+                record.requestedAccountType :
+                ['user', 'patient'].includes(record.role) ? 'patient' : null,
+            createdAt: record.createdAt instanceof Timestamp ?
+              record.createdAt.toDate().toISOString() : null,
+          };
+        }),
+        recentDoctorApplications: recentDoctorApplications.docs.map((snapshot) => {
+          const record = snapshot.data();
+          return {
+            uid: snapshot.id,
+            fullName: typeof record.fullName === 'string' ?
+              record.fullName : 'Unnamed applicant',
+            email: typeof record.email === 'string' ? record.email : '',
+            specialty: typeof record.specialty === 'string' ?
+              record.specialty : '',
+            facilityName: typeof record.facilityName === 'string' ?
+              record.facilityName : '',
+            updatedAt: record.updatedAt instanceof Timestamp ?
+              record.updatedAt.toDate().toISOString() : null,
+          };
+        }),
         generatedAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -103,6 +159,10 @@ export const listAdminUsers = functions.https.onCall(async (data, context) => {
       users: result.users.map((user, index) => {
         const requestedAccountType =
           profiles[index].data()?.requestedAccountType;
+        const accountType = requestedAccountType === 'patient' ||
+          requestedAccountType === 'doctor' ? requestedAccountType :
+            ['user', 'patient'].includes(profiles[index].data()?.role) ?
+              'patient' : null;
         return {
           uid: user.uid,
           email: user.email ?? null,
@@ -111,10 +171,7 @@ export const listAdminUsers = functions.https.onCall(async (data, context) => {
           emailVerified: user.emailVerified,
           createdAt: user.metadata.creationTime,
           lastSignInAt: user.metadata.lastSignInTime ?? null,
-          requestedAccountType:
-            requestedAccountType === 'patient' ||
-            requestedAccountType === 'doctor' ?
-              requestedAccountType : null,
+          requestedAccountType: accountType,
         };
       }),
       nextPageToken: result.pageToken ?? null,

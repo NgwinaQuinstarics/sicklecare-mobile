@@ -13,6 +13,24 @@ export interface DashboardSummary {
   newUsersLast7Days: number;
   openSupportCount: number;
   openContactCount: number;
+  pendingDoctorCount: number;
+  doctorsNeedingCredentialsCount: number;
+  approvedDoctorCount: number;
+  recentUsers: Array<{
+    uid: string;
+    name: string;
+    email: string;
+    requestedAccountType: 'patient' | 'doctor' | null;
+    createdAt: string | null;
+  }>;
+  recentDoctorApplications: Array<{
+    uid: string;
+    fullName: string;
+    email: string;
+    specialty: string;
+    facilityName: string;
+    updatedAt: string | null;
+  }>;
   generatedAt: string;
 }
 

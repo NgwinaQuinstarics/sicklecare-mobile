@@ -72,9 +72,11 @@ sicklecare_backend/
 
 ### Admin dashboard
 
-The secure web console is a Firebase Hosting SPA under `admin/`. It provides a
-dashboard summary, paginated account directory, live support/contact inbox,
-request status changes, and home-content publishing. Dashboard content and
+The secure web console is a Firebase Hosting SPA under `admin/`. Its overview
+fetches registered-account and approved/pending-doctor totals, recent account
+registrations, pending doctor applications, and recent support/contact
+requests. It also provides a paginated account directory, live support/contact
+inbox, request status changes, and home-content publishing. Dashboard content and
 inbox mutations go through admin-claim protected, rate-limited callables and
 write metadata-only records to `admin_audit_logs`. Individual user details and
 synced tracker entries are available on demand from the user directory through
@@ -178,7 +180,8 @@ firebase deploy --only firestore:indexes
 
 #### Admin functions
 
-- `getAdminDashboardSummary`: bounded summary counts for accounts and open requests.
+- `getAdminDashboardSummary`: bounded summary counts for accounts, doctor
+  application states, open requests, and recent account/application previews.
 - `listAdminUsers`: read-only, paginated Firebase Auth directory (maximum 50 per page), including the account type saved in each profile.
 - `getAdminUserDetails`: returns allowlisted account/profile fields and a bounded page of synced tracker entries for one selected user. Every access writes an audit event; tracker fields are never read directly by the browser.
 - `updateAdminInboxStatus`: validates a support/contact status change and records an audit event atomically.

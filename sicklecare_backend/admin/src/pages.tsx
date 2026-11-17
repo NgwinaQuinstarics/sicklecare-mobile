@@ -279,6 +279,22 @@ export function OverviewView({ onNavigate }: OverviewViewProps) {
           tone="green"
           onClick={() => onNavigate('inbox')}
         />
+        <MetricCard
+          label="Doctor reviews"
+          value={summary?.pendingDoctorCount ?? (loading ? null : 0)}
+          detail={`${summary?.doctorsNeedingCredentialsCount ?? 0} applicants need credentials`}
+          icon={ShieldCheck}
+          tone="amber"
+          onClick={() => onNavigate('doctors')}
+        />
+        <MetricCard
+          label="Approved doctors"
+          value={summary?.approvedDoctorCount ?? (loading ? null : 0)}
+          detail="Approved professional accounts"
+          icon={BadgeCheck}
+          tone="green"
+          onClick={() => onNavigate('doctors')}
+        />
       </div>
 
       <div className="overview-grid">
@@ -348,6 +364,100 @@ export function OverviewView({ onNavigate }: OverviewViewProps) {
           <div className="pulse-footer">
             <span><ShieldCheck size={14} /> Individual health records are available in the user directory; every view is audited</span>
           </div>
+        </section>
+      </div>
+
+      <div className="intake-grid">
+        <section className="panel intake-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Latest registrations</h2>
+              <p>New accounts saved to SickleCare</p>
+            </div>
+            <button className="link-button" onClick={() => onNavigate('users')}>
+              User directory <ArrowRight size={15} />
+            </button>
+          </div>
+          {loading && !summary ? (
+            <div className="loading-row"><LoaderCircle className="spin" size={19} /> Loading registrations…</div>
+          ) : !(summary?.recentUsers?.length ?? 0) ? (
+            <EmptyState
+              icon={Users}
+              title="No registrations yet"
+              description="New account details will appear here after they are saved."
+            />
+          ) : (
+            <div className="intake-list">
+              {(summary?.recentUsers ?? []).map((account) => (
+                <button
+                  className="intake-row"
+                  key={account.uid}
+                  onClick={() => onNavigate('users')}
+                  type="button"
+                >
+                  <span className="intake-avatar">
+                    {(account.name || account.email || 'U').slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="intake-copy">
+                    <strong>{account.name || 'Unnamed account'}</strong>
+                    <small>{account.email || 'No email on profile'}</small>
+                  </span>
+                  <span className="intake-meta">
+                    <span>{account.requestedAccountType === 'doctor' ? 'Doctor' : account.requestedAccountType === 'patient' ? 'Patient' : 'Account'}</span>
+                    <small>{formatDate(account.createdAt)}</small>
+                  </span>
+                  <ArrowUpRight className="recent-arrow" size={15} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel intake-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Doctor applications</h2>
+              <p>Credential-ready applications awaiting review</p>
+            </div>
+            <button className="link-button" onClick={() => onNavigate('doctors')}>
+              Review doctors <ArrowRight size={15} />
+            </button>
+          </div>
+          {loading && !summary ? (
+            <div className="loading-row"><LoaderCircle className="spin" size={19} /> Loading applications…</div>
+          ) : !(summary?.recentDoctorApplications?.length ?? 0) ? (
+            <EmptyState
+              icon={ShieldCheck}
+              title="No reviews waiting"
+              description={summary?.doctorsNeedingCredentialsCount
+                ? `${summary.doctorsNeedingCredentialsCount} applicant${summary.doctorsNeedingCredentialsCount === 1 ? ' is' : 's are'} still uploading credentials.`
+                : 'New doctor applications will appear here.'}
+            />
+          ) : (
+            <div className="intake-list">
+              {(summary?.recentDoctorApplications ?? []).map((application) => (
+                <button
+                  className="intake-row"
+                  key={application.uid}
+                  onClick={() => onNavigate('doctors')}
+                  type="button"
+                >
+                  <span className="intake-avatar intake-avatar-doctor">
+                    <ShieldCheck size={17} />
+                  </span>
+                  <span className="intake-copy">
+                    <strong>{application.fullName}</strong>
+                    <small>{application.specialty || 'Specialty not provided'} · {application.facilityName || 'Facility not provided'}</small>
+                  </span>
+                  <span className="intake-meta">
+                    <span>Pending review</span>
+                    <small>{formatDate(application.updatedAt)}</small>
+                  </span>
+                  <ArrowUpRight className="recent-arrow" size={15} />
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 

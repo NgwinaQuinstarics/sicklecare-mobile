@@ -275,7 +275,7 @@ h1, h2, h3 { font-family: 'Segoe UI', Inter, sans-serif; }
 .button-wide { width: 100%; }
 .refresh-button { min-width: 99px; }
 
-.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; }
+.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
 
 .metric-card {
   position: relative;
@@ -303,6 +303,19 @@ h1, h2, h3 { font-family: 'Segoe UI', Inter, sans-serif; }
 .metric-foot svg { flex: 0 0 auto; color: #d47a73; }
 
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(290px, .9fr); gap: 16px; margin-top: 17px; }
+.intake-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 17px; }
+.intake-panel { min-width: 0; padding: 20px; }
+.intake-list { display: grid; }
+.intake-row { display: flex; min-width: 0; align-items: center; gap: 11px; padding: 13px 2px; text-align: left; border: 0; border-top: 1px solid #eef0f4; background: transparent; cursor: pointer; }
+.intake-row:hover .intake-copy strong { color: #b84949; }
+.intake-avatar { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; color: #456b9b; border-radius: 11px; background: #edf3fb; font-size: 13px; font-weight: 700; }
+.intake-avatar-doctor { color: #7353a0; background: #f3edfb; }
+.intake-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.intake-copy strong { overflow: hidden; color: #34415a; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.intake-copy small { overflow: hidden; color: #8a94a7; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.intake-meta { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 4px; color: #53627a; font-size: 9px; }
+.intake-meta small { color: #929bae; font-size: 9px; }
+.intake-row > .recent-arrow { flex: 0 0 auto; }
 .panel { min-width: 0; border: 1px solid #e8ecf3; border-radius: 11px; background: #fff; box-shadow: 0 3px 13px #20355707; }
 .recent-panel, .pulse-panel { min-height: 264px; padding: 20px 20px 0; }
 .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
@@ -612,6 +625,7 @@ h1, h2, h3 { font-family: 'Segoe UI', Inter, sans-serif; }
   .topbar { justify-content: flex-start; gap: 9px; }
   .topbar-actions { margin-left: auto; }
   .overview-grid { grid-template-columns: minmax(0, 1.25fr) minmax(255px, .9fr); }
+  .intake-grid { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-foot { font-size: 9px; }
   .app-footer { padding-bottom: 14px; }
